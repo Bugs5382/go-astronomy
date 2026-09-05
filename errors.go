@@ -52,6 +52,24 @@ const (
 	// CodeInvalidMagnitudeRange marks a stellar magnitude query whose bright
 	// bound is fainter than its faint bound, which can select no star.
 	CodeInvalidMagnitudeRange = 7004
+	// CodeInvalidCanvas marks a screen projection whose canvas width or height is
+	// not positive, so it spans no pixels.
+	CodeInvalidCanvas = 7005
+	// CodeInvalidHorizonFraction marks a viewport whose horizon fraction is
+	// outside [0, 1], so the horizon line would fall off the canvas.
+	CodeInvalidHorizonFraction = 7006
+	// CodeInvalidPeakAltitude marks a NormalizedByPeak projection whose peak
+	// altitude is not positive, which cannot normalize an arch.
+	CodeInvalidPeakAltitude = 7007
+	// CodeInvalidFieldOfView marks an azimuth-based projection whose field of view
+	// (Directional) or sunrise-to-sunset azimuth span (FullArc) is not positive.
+	CodeInvalidFieldOfView = 7008
+	// CodeInvalidElevationScale marks a Geometric projection whose elevation
+	// degrees-per-pixel is not positive.
+	CodeInvalidElevationScale = 7009
+	// CodeXModeNotAzimuth marks a column-to-azimuth inverse query on a projection
+	// whose horizontal mode is not azimuth-based, so no azimuth axis exists.
+	CodeXModeNotAzimuth = 7010
 )
 
 // errorEntries is the module's code table. It feeds the go-apperr registry that
@@ -61,6 +79,12 @@ var errorEntries = []apperr.Entry{
 	{Code: CodeInvalidLongitude, Title: "observer", Cause: "observer longitude outside [-180, 180]"},
 	{Code: CodeInvalidSegmentation, Title: "segmentation", Cause: "segmentation levels empty or not strictly ascending"},
 	{Code: CodeInvalidMagnitudeRange, Title: "magnitude", Cause: "magnitude range bright bound fainter than faint bound"},
+	{Code: CodeInvalidCanvas, Title: "projection", Cause: "canvas width or height not positive"},
+	{Code: CodeInvalidHorizonFraction, Title: "projection", Cause: "horizon fraction outside [0, 1]"},
+	{Code: CodeInvalidPeakAltitude, Title: "projection", Cause: "normalized peak altitude not positive"},
+	{Code: CodeInvalidFieldOfView, Title: "projection", Cause: "azimuth field of view or arc span not positive"},
+	{Code: CodeInvalidElevationScale, Title: "projection", Cause: "geometric elevation degrees-per-pixel not positive"},
+	{Code: CodeXModeNotAzimuth, Title: "projection", Cause: "column-to-azimuth query on a non-azimuth horizontal mode"},
 }
 
 // logSink adapts a go-log Logger to the go-apperr Logger interface. It is the
