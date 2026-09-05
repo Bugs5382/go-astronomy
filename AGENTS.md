@@ -99,6 +99,13 @@ func main() {
 6. **Absence is explicit.** Expect `(value, bool)` / `(value, error)` where a
    result may not exist (no sunrise on a polar day). There are no `-1` / `false`
    sentinels; polar conditions are an explicit state, never a nil panic.
+   Every returned `error` is a `go-apperr` coded error: match it with
+   `errors.Is` (e.g. `earth.ErrInvalidLatitude`, `earth.ErrInvalidLongitude`,
+   `earth.ErrInvalidSegmentation`) or recover the stable code with
+   `apperr.Code(err)`. `astronomy.Errors()` returns the code registry; present a
+   coded error at your edge with `Registry.Present` / `PresentContext`. The
+   library never logs on its own and never enables OpenTelemetry — both belong in
+   the consuming service.
 7. **Do not import `internal/`.** It is unexported by policy and may change
    without notice. Consume only the packages in the map above.
 8. **Accuracy is arcminute-class.** Nutation, ΔT, and leap seconds are

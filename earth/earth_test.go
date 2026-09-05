@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	apperr "github.com/Bugs5382/go-apperr"
 	astronomy "github.com/Bugs5382/go-astronomy"
 	"github.com/Bugs5382/go-astronomy/earth"
 )
@@ -443,29 +444,46 @@ func TestSegmentAtMatchesSunTimes(t *testing.T) {
 	}
 }
 
+// wantCoded asserts that err both matches the sentinel cause via errors.Is and
+// carries the expected stable go-apperr code, the two ways a caller inspects a
+// coded error.
+func wantCoded(t *testing.T, context string, err error, cause error, code int) {
+	t.Helper()
+	if !errors.Is(err, cause) {
+		t.Errorf("%s: err = %v, want errors.Is %v", context, err, cause)
+	}
+	if got, ok := apperr.Code(err); !ok || got != code {
+		t.Errorf("%s: code = %d (ok=%v), want %d", context, got, ok, code)
+	}
+}
+
 func TestConstructorErrors(t *testing.T) {
 	t.Parallel()
-	bad := astronomy.Observer{Lat: 120, Lng: 0, TZ: time.UTC}
-	if _, err := earth.NewSunTimes(bad, canonical); !errors.Is(err, earth.ErrInvalidLatitude) {
-		t.Errorf("NewSunTimes bad latitude: err = %v, want ErrInvalidLatitude", err)
-	}
-	if _, _, err := earth.SegmentAt(bad, canonical); !errors.Is(err, earth.ErrInvalidLatitude) {
-		t.Errorf("SegmentAt bad latitude: err = %v, want ErrInvalidLatitude", err)
-	}
+	badLat := astronomy.Observer{Lat: 120, Lng: 0, TZ: time.UTC}
+	_, err := earth.NewSunTimes(badLat, canonical)
+	wantCoded(t, "NewSunTimes bad latitude", err, earth.ErrInvalidLatitude, astronomy.CodeInvalidLatitude)
+	_, _, err = earth.SegmentAt(badLat, canonical)
+	wantCoded(t, "SegmentAt bad latitude", err, earth.ErrInvalidLatitude, astronomy.CodeInvalidLatitude)
+
+	badLng := astronomy.Observer{Lat: 0, Lng: 200, TZ: time.UTC}
+	_, err = earth.NewSunTimes(badLng, canonical)
+	wantCoded(t, "NewSunTimes bad longitude", err, earth.ErrInvalidLongitude, astronomy.CodeInvalidLongitude)
+	_, _, err = earth.SegmentAt(badLng, canonical)
+	wantCoded(t, "SegmentAt bad longitude", err, earth.ErrInvalidLongitude, astronomy.CodeInvalidLongitude)
+
 	empty := earth.Segmentation{Night: "night", Horizon: -0.833}
-	if _, err := earth.NewSunTimesWith(brooklyn, canonical, empty); !errors.Is(err, earth.ErrInvalidSegmentation) {
-		t.Errorf("empty segmentation: err = %v, want ErrInvalidSegmentation", err)
-	}
+	_, err = earth.NewSunTimesWith(brooklyn, canonical, empty)
+	wantCoded(t, "empty segmentation", err, earth.ErrInvalidSegmentation, astronomy.CodeInvalidSegmentation)
+
 	descending := earth.Segmentation{
 		Night: "night", Horizon: -0.833,
 		Levels: []earth.Level{{Altitude: 6}, {Altitude: -6}},
 	}
-	if _, err := earth.NewSunTimesWith(brooklyn, canonical, descending); !errors.Is(err, earth.ErrInvalidSegmentation) {
-		t.Errorf("descending segmentation: err = %v, want ErrInvalidSegmentation", err)
-	}
-	if _, _, err := earth.SegmentAtWith(brooklyn, canonical, empty); !errors.Is(err, earth.ErrInvalidSegmentation) {
-		t.Errorf("SegmentAtWith empty segmentation: err = %v, want ErrInvalidSegmentation", err)
-	}
+	_, err = earth.NewSunTimesWith(brooklyn, canonical, descending)
+	wantCoded(t, "descending segmentation", err, earth.ErrInvalidSegmentation, astronomy.CodeInvalidSegmentation)
+
+	_, _, err = earth.SegmentAtWith(brooklyn, canonical, empty)
+	wantCoded(t, "SegmentAtWith empty segmentation", err, earth.ErrInvalidSegmentation, astronomy.CodeInvalidSegmentation)
 }
 
 // TestCustomSegmentation exercises a consumer-supplied vocabulary: two levels
