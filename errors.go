@@ -49,6 +49,9 @@ const (
 	// CodeInvalidSegmentation marks a Segmentation whose levels are empty or not
 	// in strictly ascending altitude order.
 	CodeInvalidSegmentation = 7003
+	// CodeInvalidMagnitudeRange marks a stellar magnitude query whose bright
+	// bound is fainter than its faint bound, which can select no star.
+	CodeInvalidMagnitudeRange = 7004
 )
 
 // errorEntries is the module's code table. It feeds the go-apperr registry that
@@ -57,6 +60,7 @@ var errorEntries = []apperr.Entry{
 	{Code: CodeInvalidLatitude, Title: "observer", Cause: "observer latitude outside [-90, 90]"},
 	{Code: CodeInvalidLongitude, Title: "observer", Cause: "observer longitude outside [-180, 180]"},
 	{Code: CodeInvalidSegmentation, Title: "segmentation", Cause: "segmentation levels empty or not strictly ascending"},
+	{Code: CodeInvalidMagnitudeRange, Title: "magnitude", Cause: "magnitude range bright bound fainter than faint bound"},
 }
 
 // logSink adapts a go-log Logger to the go-apperr Logger interface. It is the

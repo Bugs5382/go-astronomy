@@ -167,8 +167,10 @@ Contributions are welcome — bug reports, fixes, new coverage, and docs improve
 ## 🙏 Acknowledgements
 
 - [Jean Meeus](https://en.wikipedia.org/wiki/Jean_Meeus), *Astronomical Algorithms* — the algorithmic foundation, via [`soniakeys/meeus`](https://github.com/soniakeys/meeus) (with `soniakeys/unit` and `soniakeys/sexagesimal`).
-- The [HYG star catalog](https://github.com/astronexus/HYG-Database) — the source for the embedded named-star data.
-- The IAU constellation boundaries of Eugène Delporte, as digitized by Nancy Roman ([VizieR VI/42](https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=VI/42)).
+- The [HYG star database](https://codeberg.org/astronexus/hyg) (Hipparcos-Yale-Gliese) — the source for the embedded star catalog, used under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+- The IAU constellation boundaries of Eugène Delporte (1930), digitized by Nancy Roman (1987) as [VizieR VI/42](https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=VI/42) — the source for the embedded boundary table.
+
+See [`NOTICE`](./NOTICE) for the full attribution and licensing of the embedded data.
 
 ## 📄 License
 

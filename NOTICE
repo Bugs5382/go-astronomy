@@ -1,0 +1,46 @@
+go-astronomy
+Copyright (c) 2026 Shane
+
+This product includes software and data developed by third parties. The
+go-astronomy source code is licensed under the MIT License (see LICENSE). The
+attributions below cover embedded data and library dependencies, some of which
+carry their own licenses that continue to apply to those materials.
+
+--------------------------------------------------------------------------------
+Astronomical algorithms
+--------------------------------------------------------------------------------
+The ephemeris math is built on the soniakeys/meeus implementation of the
+algorithms in Jean Meeus, "Astronomical Algorithms".
+
+  soniakeys/meeus, soniakeys/unit, soniakeys/sexagesimal
+  https://github.com/soniakeys/meeus
+  License: MIT
+
+--------------------------------------------------------------------------------
+Star catalog (embedded: star/data/stars.csv)
+--------------------------------------------------------------------------------
+The embedded star catalog is a curated subset of the HYG database
+(Hipparcos-Yale-Gliese), compiled by David Nash / Astronomy Nexus. The subset
+contains stars with apparent magnitude <= 6.5 together with every star carrying
+a proper name; the remaining rows and columns of the full ~120,000-star catalog
+are omitted to keep the binary small.
+
+  HYG database, version 4.4
+  https://codeberg.org/astronexus/hyg
+  License: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+  https://creativecommons.org/licenses/by-sa/4.0/
+
+The star catalog data in star/data/stars.csv remains licensed under CC BY-SA 4.0.
+
+--------------------------------------------------------------------------------
+Constellation boundaries (embedded: constellation/data/boundaries.csv)
+--------------------------------------------------------------------------------
+The constellation boundary table is the official IAU constellation boundaries
+established by Eugène Delporte (1930) and rearranged for position lookup by
+Nancy G. Roman (1987), distributed as VizieR catalog VI/42.
+
+  Delporte, E. 1930, "Delimitation Scientifique des Constellations",
+    Cambridge University Press.
+  Roman, N. G. 1987, "Identification of a Constellation from a Position",
+    Publications of the Astronomical Society of the Pacific, 99, 695.
+  VizieR VI/42: https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=VI/42
