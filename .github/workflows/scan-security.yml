@@ -16,17 +16,19 @@ jobs:
   go-security:
     name: go security (gosec, govulncheck)
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('go.mod') != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
+        if: ${{ hashFiles('go.mod') != '' }}
         with:
           go-version-file: go.mod
       - name: govulncheck
+        if: ${{ hashFiles('go.mod') != '' }}
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
       - name: gosec
+        if: ${{ hashFiles('go.mod') != '' }}
         uses: securego/gosec@master
         with:
           args: ./...
