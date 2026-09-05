@@ -1,0 +1,65 @@
+name: Docs Site
+# Build the Docusaurus documentation site in website/ and deploy it to GitHub
+# Pages. The build job runs on every PR and push so a broken site fails at PR
+# time; the deploy job runs only on push to main and is guarded so it does not
+# hard-fail CI while the repo is private and Pages is not yet enabled. Once the
+# repo is public and Pages is turned on (Settings -> Pages -> Source = GitHub
+# Actions), the deploy step publishes automatically.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/job-docs-pages.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/job-docs-pages.yaml'
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  build:
+    name: 🏗️ Build site
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+      - name: ⬢ Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - name: 📦 Install dependencies
+        run: npm ci
+      - name: 🔨 Build
+        run: npm run build
+      - name: 📤 Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/build
+  deploy:
+    name: 🚀 Deploy to Pages
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Guard: while the repo is private and Pages is off, the deploy fails at the
+    # deploy step. continue-on-error keeps that from turning the run red until
+    # Pages is enabled on a public repo.
+    continue-on-error: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 🚀 Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

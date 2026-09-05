@@ -9,3 +9,9 @@ plan/
 .DS_Store
 .idea/
 .vscode/
+
+# Docusaurus documentation site (website/)
+website/node_modules/
+website/build/
+website/.docusaurus/
+website/.cache-loader/
