@@ -29,7 +29,6 @@ import (
 	"time"
 
 	astronomy "github.com/Bugs5382/go-astronomy"
-	"github.com/Bugs5382/go-astronomy/sun"
 )
 
 // coarseStep is the sampling interval used to bracket altitude-threshold
@@ -136,7 +135,7 @@ func build(obs astronomy.Observer, date time.Time, seg Segmentation) *SunTimes {
 	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
 	end := start.AddDate(0, 0, 1)
 
-	altAt := func(t time.Time) float64 { return sun.Position(obs, t).Altitude }
+	altAt := func(t time.Time) float64 { return SunPosition(obs, t).Altitude }
 
 	noon := solarNoon(altAt, start, end)
 	minAlt := dayMinAltitude(altAt, start, end)

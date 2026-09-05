@@ -31,7 +31,6 @@ import (
 
 	astronomy "github.com/Bugs5382/go-astronomy"
 	"github.com/Bugs5382/go-astronomy/earth"
-	"github.com/Bugs5382/go-astronomy/sun"
 )
 
 // canonical is the design's reference date; only its calendar day is used, the
@@ -251,13 +250,13 @@ func TestSolarNoonIsAltitudePeak(t *testing.T) {
 		if noon.Before(st.DayStart()) || noon.After(st.DayEnd()) {
 			t.Errorf("%s: noon %v outside day", f.name, noon)
 		}
-		peak := sun.Position(f.obs, noon).Altitude
+		peak := earth.SunPosition(f.obs, noon).Altitude
 		for _, off := range []time.Duration{-30 * time.Minute, -5 * time.Minute, 5 * time.Minute, 30 * time.Minute} {
 			when := noon.Add(off)
 			if when.Before(st.DayStart()) || when.After(st.DayEnd()) {
 				continue
 			}
-			if a := sun.Position(f.obs, when).Altitude; a > peak+1e-6 {
+			if a := earth.SunPosition(f.obs, when).Altitude; a > peak+1e-6 {
 				t.Errorf("%s: altitude %.5f at %v exceeds noon peak %.5f", f.name, a, when, peak)
 			}
 		}

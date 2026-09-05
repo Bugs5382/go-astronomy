@@ -32,16 +32,15 @@ import (
 
 	"github.com/Bugs5382/go-astronomy"
 	"github.com/Bugs5382/go-astronomy/earth"
-	"github.com/Bugs5382/go-astronomy/sun"
 )
 
 func main() {
 	tz, _ := time.LoadLocation("America/New_York")
-	obs := astronomy.Observer{Lat: 40.678, Lon: -73.944, TZ: tz} // Brooklyn, NY
+	obs := astronomy.Observer{Lat: 40.678, Lng: -73.944, TZ: tz} // Brooklyn, NY
 	now := time.Now().In(tz)
 
-	// Universal geometry: geometric altitude/azimuth of the Sun's disc center.
-	pos := sun.Position(obs, now)
+	// Earth vantage: geometric altitude/azimuth of the Sun's disc center.
+	pos := earth.SunPosition(obs, now)
 	fmt.Printf("sun alt=%.2f° az=%.2f°\n", pos.Altitude, pos.Azimuth)
 
 	// Earth-bound traits: one civil day of twilight bands, resolved in obs.TZ.
@@ -59,7 +58,8 @@ The library returns `(value, bool)` / `(value, error)` where a value may be abse
 
 ## ✨ Features
 
-- ☀️ **Universal Sun geometry** — `sun.Position` (geometric alt/az of the disc center) and `sun.Track` (arc samples of `{Time, Altitude, Azimuth, TimeProgress}`). The Sun is universal to the solar system; it carries no Earth-specific labels.
+- ☀️ **Universal Sun physics** — `sun.ApparentDiameter` / `sun.ApparentSemidiameter` give the Sun's apparent angular size for any distance in AU, from the semidiameter-at-1-AU constant. This is the only observer-independent part of the Sun, so any vantage body reuses it with its own distance.
+- 🌅 **Earth vantage on the Sun** — `earth.SunPosition` (geometric alt/az of the disc center, paired with apparent diameter) and `earth.SunTrack` (arc samples of `{Time, Altitude, Azimuth, TimeProgress}`). The alt/az, sidereal time, and Earth-Sun distance are all Earth-specific, so they live with the Earth vantage rather than in `sun`.
 - 🌇 **Earth twilight bands** *(roadmap)* — `earth.NewSunTimes` resolves one civil day in the observer's timezone with Earth refraction (−0.833° upper limb, Bennett): astronomical/nautical/civil dawn, sunrise, golden hour, day split at solar noon, golden hour, sunset, and the matching dusk bands. Each band is `{from, to, seconds}`.
 - 🌗 **Moon (Luna)** *(roadmap)* — `earth/moon` position and apparent position, next rise/set, the eight named phases, `Age`, `Illumination`, `PhaseAngle`, next new/full, blue-moon detection, and `Track`. The Moon belongs to Earth; other bodies own their own moons.
 - ⭐ **Stars** *(roadmap)* — an embedded HYG-derived named-star catalog with RA/Dec **and distance**, projected to alt/az for the observer and instant.
