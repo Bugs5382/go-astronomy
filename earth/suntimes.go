@@ -28,6 +28,7 @@ import (
 	"sort"
 	"time"
 
+	apperr "github.com/Bugs5382/go-apperr"
 	astronomy "github.com/Bugs5382/go-astronomy"
 )
 
@@ -37,15 +38,38 @@ import (
 // the narrowest of which spans roughly two minutes near the horizon.
 const coarseStep = time.Minute
 
-// Errors returned by the constructors.
+// Sentinel causes wrapped by the constructors. Each is returned inside a
+// go-apperr coded error, so errors.Is keeps matching these values while
+// apperr.Code recovers the stable numeric code (see the astronomy package's code
+// registry). Match a condition with errors.Is(err, ErrInvalid...) or branch on
+// the code with apperr.Code(err).
 var (
-	// ErrInvalidLatitude is returned when the observer's latitude is outside
-	// the physical range [-90, 90].
+	// ErrInvalidLatitude is the cause when the observer's latitude is outside
+	// the physical range [-90, 90]; the coded error carries
+	// astronomy.CodeInvalidLatitude.
 	ErrInvalidLatitude = errors.New("earth: observer latitude out of range")
-	// ErrInvalidSegmentation is returned when a Segmentation has no levels or
-	// its levels are not in strictly ascending altitude order.
+	// ErrInvalidLongitude is the cause when the observer's longitude is outside
+	// the range [-180, 180]; the coded error carries
+	// astronomy.CodeInvalidLongitude.
+	ErrInvalidLongitude = errors.New("earth: observer longitude out of range")
+	// ErrInvalidSegmentation is the cause when a Segmentation has no levels or
+	// its levels are not in strictly ascending altitude order; the coded error
+	// carries astronomy.CodeInvalidSegmentation.
 	ErrInvalidSegmentation = errors.New("earth: segmentation levels must be non-empty and strictly ascending")
 )
+
+// validateObserver reports the coded error for an out-of-range observer, or nil
+// when the latitude and longitude are both physical. It centralizes the input
+// contract shared by the day constructors and the instant resolver.
+func validateObserver(obs astronomy.Observer) error {
+	if obs.Lat < -90 || obs.Lat > 90 {
+		return apperr.Coded(astronomy.CodeInvalidLatitude, ErrInvalidLatitude)
+	}
+	if obs.Lng < -180 || obs.Lng > 180 {
+		return apperr.Coded(astronomy.CodeInvalidLongitude, ErrInvalidLongitude)
+	}
+	return nil
+}
 
 // SunTimes is the Sun's civil day for one observer: the ordered twilight and
 // daylight bands, solar noon, and any polar state. It is a snapshot of a single
@@ -64,6 +88,11 @@ type SunTimes struct {
 // following local midnight and honors daylight-saving transitions, so its length
 // is 23 or 25 hours on such days. Only the year, month, and day of date are
 // used; its time of day is ignored.
+//
+// It returns a go-apperr coded error when the observer's latitude or longitude
+// is out of range: match the condition with errors.Is against ErrInvalidLatitude
+// or ErrInvalidLongitude, or recover the code with apperr.Code (see the
+// astronomy package's code registry).
 func NewSunTimes(obs astronomy.Observer, date time.Time) (*SunTimes, error) {
 	return NewSunTimesWith(obs, date, DefaultSegmentation)
 }
@@ -71,8 +100,8 @@ func NewSunTimes(obs astronomy.Observer, date time.Time) (*SunTimes, error) {
 // NewSunTimesWith is NewSunTimes with a caller-supplied Segmentation, letting a
 // consumer redefine the thresholds and labels wholesale.
 func NewSunTimesWith(obs astronomy.Observer, date time.Time, seg Segmentation) (*SunTimes, error) {
-	if obs.Lat < -90 || obs.Lat > 90 {
-		return nil, ErrInvalidLatitude
+	if err := validateObserver(obs); err != nil {
+		return nil, err
 	}
 	if err := validateSegmentation(seg); err != nil {
 		return nil, err
@@ -84,11 +113,11 @@ func NewSunTimesWith(obs astronomy.Observer, date time.Time, seg Segmentation) (
 // level, ascending altitudes.
 func validateSegmentation(seg Segmentation) error {
 	if len(seg.Levels) == 0 {
-		return ErrInvalidSegmentation
+		return apperr.Coded(astronomy.CodeInvalidSegmentation, ErrInvalidSegmentation)
 	}
 	for i := 1; i < len(seg.Levels); i++ {
 		if seg.Levels[i].Altitude <= seg.Levels[i-1].Altitude {
-			return ErrInvalidSegmentation
+			return apperr.Coded(astronomy.CodeInvalidSegmentation, ErrInvalidSegmentation)
 		}
 	}
 	return nil
@@ -357,8 +386,8 @@ func SegmentAt(obs astronomy.Observer, t time.Time) (Segment, float64, error) {
 
 // SegmentAtWith is SegmentAt with a caller-supplied Segmentation.
 func SegmentAtWith(obs astronomy.Observer, t time.Time, seg Segmentation) (Segment, float64, error) {
-	if obs.Lat < -90 || obs.Lat > 90 {
-		return Segment{}, 0, ErrInvalidLatitude
+	if err := validateObserver(obs); err != nil {
+		return Segment{}, 0, err
 	}
 	if err := validateSegmentation(seg); err != nil {
 		return Segment{}, 0, err
