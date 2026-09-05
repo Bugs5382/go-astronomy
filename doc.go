@@ -1,6 +1,10 @@
-// Package astronomy is Go astronomy library: observer-aware sun, moon, star, and constellation positions with twilight bands, arcs, and moon phases.
+// Package astronomy is an observer-aware Go astronomy library: sun, moon, star,
+// and constellation positions with twilight bands, arc tracks, and moon phases.
 //
-// Replace this scaffold with the package's real implementation.
+// This root package holds the shared domain types (Observer, Horizontal,
+// Position, AngularDiameter) used across the body-specific packages. The
+// heavy math lives in unexported internal packages built on the meeus
+// ephemeris algorithms.
 package astronomy
 
 /*
