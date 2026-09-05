@@ -34,7 +34,7 @@ import (
 )
 
 var (
-	northObs = astronomy.Observer{Lat: 40.7128, Lng: -74.0060} // New York
+	northObs = astronomy.Observer{Lat: 40.7128, Lng: -74.0060}  // New York
 	southObs = astronomy.Observer{Lat: -33.8688, Lng: 151.2093} // Sydney
 )
 
