@@ -30,6 +30,7 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import (
 	"github.com/soniakeys/meeus/v3/coord"
+	"github.com/soniakeys/meeus/v3/precess"
 	"github.com/soniakeys/unit"
 
 	"github.com/Bugs5382/go-astronomy/internal/angles"
@@ -71,6 +72,21 @@ func EclipticToEquatorial(ecl Ecliptic, obliquityDeg float64) Equatorial {
 	obl := coord.NewObliquity(unit.AngleFromDeg(obliquityDeg))
 	ra, dec := coord.EclToEq(unit.AngleFromDeg(ecl.Lon), unit.AngleFromDeg(ecl.Lat), obl.S, obl.C)
 	return Equatorial{RA: angles.Normalize(ra.Deg()), Dec: dec.Deg()}
+}
+
+// PrecessEquatorial precesses an equatorial position from the epochFrom equinox
+// to the epochTo equinox, both given as Julian years (for example 2000.0 for
+// J2000.0). Proper motion is not applied; the transform accounts for the
+// precession of the equinoxes only. It uses the meeus rigorous precession model
+// and returns coordinates with RA normalized to [0, 360).
+func PrecessEquatorial(eq Equatorial, epochFrom, epochTo float64) Equatorial {
+	from := &coord.Equatorial{
+		RA:  unit.RAFromDeg(eq.RA),
+		Dec: unit.AngleFromDeg(eq.Dec),
+	}
+	to := &coord.Equatorial{}
+	precess.Position(from, to, epochFrom, epochTo, 0, 0)
+	return Equatorial{RA: angles.Normalize(to.RA.Deg()), Dec: to.Dec.Deg()}
 }
 
 // EquatorialToHorizontal converts an equatorial position to horizontal

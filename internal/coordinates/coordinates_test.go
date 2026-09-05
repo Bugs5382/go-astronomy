@@ -150,3 +150,34 @@ func TestEquatorialHorizontalRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestPrecessEquatorialRoundTrip(t *testing.T) {
+	t.Parallel()
+	cases := []Equatorial{
+		{RA: 101.287, Dec: -16.716}, // Sirius
+		{RA: 37.95, Dec: 89.264},    // Polaris
+		{RA: 279.234, Dec: 38.784},  // Vega
+		{RA: 0.5, Dec: 0},
+	}
+	for _, eq := range cases {
+		back := PrecessEquatorial(PrecessEquatorial(eq, 2000, 1875.0287), 1875.0287, 2000)
+		if math.Abs(back.RA-eq.RA) > 1e-6 || math.Abs(back.Dec-eq.Dec) > 1e-6 {
+			t.Errorf("precession round trip %+v -> %+v", eq, back)
+		}
+		if back.RA < 0 || back.RA >= 360 {
+			t.Errorf("RA %v out of [0,360)", back.RA)
+		}
+	}
+}
+
+// TestPrecessEquatorialMovesPosition confirms precession actually shifts a
+// mid-declination star: over a century-plus the equinox drift is well over a
+// degree in right ascension.
+func TestPrecessEquatorialMovesPosition(t *testing.T) {
+	t.Parallel()
+	eq := Equatorial{RA: 101.287, Dec: -16.716} // Sirius
+	got := PrecessEquatorial(eq, 2000, 1875.0287)
+	if math.Abs(got.RA-eq.RA) < 1.0 {
+		t.Errorf("precession barely moved RA: %v -> %v", eq.RA, got.RA)
+	}
+}
