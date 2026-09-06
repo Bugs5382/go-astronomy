@@ -26,8 +26,6 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 import (
 	"time"
 
-	meeusjulian "github.com/soniakeys/meeus/v3/julian"
-
 	astronomy "github.com/Bugs5382/go-astronomy"
 	"github.com/Bugs5382/go-astronomy/internal/coordinates"
 	"github.com/Bugs5382/go-astronomy/internal/julian"
@@ -60,7 +58,7 @@ func StarPosition(s star.Star, obs astronomy.Observer, t time.Time) (astronomy.H
 		return astronomy.Horizontal{}, err
 	}
 
-	epochOfDate := starEpoch + (meeusjulian.TimeToJD(t.UTC())-2451545.0)/365.25
+	epochOfDate := julian.JulianYear(t)
 	eq := coordinates.PrecessEquatorial(
 		coordinates.Equatorial{RA: s.RA, Dec: s.Dec},
 		starEpoch, epochOfDate,

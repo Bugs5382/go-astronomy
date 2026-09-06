@@ -9,7 +9,7 @@
 
 `go-astronomy` computes where the Sun, Moon, and stars are in the sky for a given observer and instant. It emits **degrees** (altitude, azimuth) and time-progress — never pixels — so any consumer can drive an animated sky, a rise/set table, a twilight timeline, or a moon-phase widget from the same data.
 
-It is designed for a service that computes a distinct sky per site visitor, so the API is **stateless, deterministic, and concurrency-safe**: `time.Time` is always a parameter, never captured at construction. The math is built on the mature [`soniakeys/meeus`](https://github.com/soniakeys/meeus) implementation of Jean Meeus' *Astronomical Algorithms* (arcminute-class accuracy).
+It is designed for a service that computes a distinct sky per site visitor, so the API is **stateless, deterministic, and concurrency-safe**: `time.Time` is always a parameter, never captured at construction. The math is an in-house implementation of Jean Meeus' *Astronomical Algorithms* with no third-party ephemeris dependency (arcminute-class accuracy).
 
 > **Status:** v1.0.0 is in active development. Sections below mark not-yet-shipped surface as **(roadmap)**; treat those signatures as indicative, not final.
 
@@ -98,9 +98,8 @@ flowchart TD
       JUL["julian / sidereal / obliquity"]
       COORD["coordinates<br/>ecliptic ⇄ equatorial ⇄ horizontal"]
       PROJ["project<br/>alt/az/progress → x/y"]
+      EPH["ephemeris<br/>Meeus series: solar, lunar, precession, nutation"]
     end
-
-    MEEUS["soniakeys/meeus"]
 
     APP["your code / service"] --> SUN
     APP --> STAR
@@ -115,7 +114,10 @@ flowchart TD
     CONST --> COORD
     COORD --> ANG
     COORD --> JUL
-    COORD --> MEEUS
+    COORD --> EPH
+    JUL --> EPH
+    EARTH --> EPH
+    MOON --> EPH
 ```
 
 Adding a future body (for example, `mars/` with its own moons and `SunTimes` equivalent) requires no change to `sun`.
@@ -166,7 +168,7 @@ Contributions are welcome — bug reports, fixes, new coverage, and docs improve
 
 ## 🙏 Acknowledgements
 
-- [Jean Meeus](https://en.wikipedia.org/wiki/Jean_Meeus), *Astronomical Algorithms* — the algorithmic foundation, via [`soniakeys/meeus`](https://github.com/soniakeys/meeus) (with `soniakeys/unit` and `soniakeys/sexagesimal`).
+- [Jean Meeus](https://en.wikipedia.org/wiki/Jean_Meeus), *Astronomical Algorithms* — the algorithmic foundation. The series in `internal/ephemeris` were ported from [`soniakeys/meeus`](https://github.com/soniakeys/meeus), which this library no longer depends on.
 - The [HYG star database](https://codeberg.org/astronexus/hyg) (Hipparcos-Yale-Gliese) — the source for the embedded star catalog, used under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 - The IAU constellation boundaries of Eugène Delporte (1930), digitized by Nancy Roman (1987) as [VizieR VI/42](https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=VI/42) — the source for the embedded boundary table.
 

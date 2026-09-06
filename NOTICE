@@ -9,10 +9,18 @@ carry their own licenses that continue to apply to those materials.
 --------------------------------------------------------------------------------
 Astronomical algorithms
 --------------------------------------------------------------------------------
-The ephemeris math is built on the soniakeys/meeus implementation of the
-algorithms in Jean Meeus, "Astronomical Algorithms".
+The ephemeris math in internal/ephemeris implements the algorithms of Jean
+Meeus, "Astronomical Algorithms", 2nd edition (Willmann-Bell, 1998). Each file
+names the chapters and numbered formulae it implements, and the series tables
+are reproduced from the book.
 
-  soniakeys/meeus, soniakeys/unit, soniakeys/sexagesimal
+  Meeus, J. 1998, "Astronomical Algorithms", 2nd ed., Willmann-Bell, Inc.
+
+The Go form of those algorithms was ported from the soniakeys/meeus
+implementation, which go-astronomy previously depended on. Corrections were
+applied during the port; they are noted at the code that carries them.
+
+  soniakeys/meeus, soniakeys/unit
   https://github.com/soniakeys/meeus
   License: MIT
 

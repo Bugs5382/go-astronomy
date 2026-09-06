@@ -54,4 +54,4 @@ At high latitudes the Sun may not cross the horizon on a given day. That is an e
 
 ## 🎯 Accuracy
 
-The target is amateur, arcminute-class accuracy, built on the Meeus algorithms via `soniakeys/meeus`. Nutation, ΔT, and leap seconds are deliberately omitted because they sit below that precision floor. Do not rely on the library for higher-precision ephemeris work.
+The target is amateur, arcminute-class accuracy, using an in-house implementation of the Meeus algorithms. ΔT and leap seconds are deliberately omitted because they sit below that precision floor. Do not rely on the library for higher-precision ephemeris work.

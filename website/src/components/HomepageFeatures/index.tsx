@@ -33,13 +33,13 @@ const FeatureList: FeatureItem[] = [
     ),
   },
   {
-    title: 'Built on Meeus',
+    title: 'Meeus, in house',
     Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
     description: (
       <>
-        The math sits on <code>soniakeys/meeus</code>, a mature implementation of
-        Jean Meeus&apos; algorithms, for arcminute-class accuracy without
-        hand-rolling ephemeris code.
+        Jean Meeus&apos; algorithms are implemented in the library itself, with
+        no third-party ephemeris dependency. Each one is anchored to a worked
+        example from the book and checked against JPL Horizons.
       </>
     ),
   },
