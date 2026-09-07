@@ -4,6 +4,16 @@ yaml-files:
   - '*.yml'
   - '.yamllint'
 
+# Only this repository's own YAML is ours to lint. Without this, `yamllint .`
+# walks the docs site's dependencies and reports hundreds of problems from
+# vendored files, so `task lint` gives a different answer depending on whether
+# anyone has installed the docs site.
+ignore: |
+  website/node_modules/
+  website/build/
+  website/.docusaurus/
+  node_modules/
+
 rules:
   braces:
     level: warning
