@@ -1,4 +1,4 @@
-import {themes as prismThemes} from 'prism-react-renderer';
+import {recommendedThemeConfig} from '@the-rabbit-hole/docs-theme/config';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
@@ -12,7 +12,7 @@ const config: Config = {
   title: 'go-astronomy',
   tagline:
     'Observer-aware Sun, Moon, star, and constellation positions for Go',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/favicon.svg',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
@@ -56,18 +56,26 @@ const config: Config = {
         },
         blog: false,
         theme: {
-          customCss: './src/css/custom.css',
+          // The brand stylesheet is the only global CSS this site loads. A
+          // site stylesheet layered on top of it would win over the brand
+          // tokens, which is how the scaffold's green and teal survived a
+          // theme that was supposedly already wired in.
+          customCss: require.resolve(
+            '@the-rabbit-hole/docs-theme/styles/custom.css',
+          ),
         },
       } satisfies Preset.Options,
     ],
   ],
 
+  // Registers the theme so its swizzled components resolve through `@theme`;
+  // today that is the collapsible right-side table of contents.
+  plugins: ['@the-rabbit-hole/docs-theme'],
+
   themeConfig: {
+    // Brand defaults: dark-first colour mode, hideable docs sidebar, prism.
+    ...recommendedThemeConfig,
     image: 'img/docusaurus-social-card.jpg',
-    colorMode: {
-      defaultMode: 'dark',
-      respectPrefersColorScheme: true,
-    },
     navbar: {
       title: 'go-astronomy',
       logo: {
@@ -122,9 +130,11 @@ const config: Config = {
       copyright: `Copyright ${new Date().getFullYear()} Shane. Built with Docusaurus.`,
     },
     prism: {
-      theme: prismThemes.github,
-      darkTheme: prismThemes.dracula,
-      additionalLanguages: ['go', 'bash'],
+      ...recommendedThemeConfig.prism,
+      additionalLanguages: [
+        ...recommendedThemeConfig.prism.additionalLanguages,
+        'go',
+      ],
     },
   } satisfies Preset.ThemeConfig,
 };
