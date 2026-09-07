@@ -1,4 +1,7 @@
-import {recommendedThemeConfig} from '@the-rabbit-hole/docs-theme/config';
+import {
+  recommendedThemeConfig,
+  recommendedVersions,
+} from '@the-rabbit-hole/docs-theme/config';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
@@ -53,6 +56,11 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           routeBasePath: 'docs',
           editUrl: `${repoUrl}/tree/main/website/`,
+          // The shared convention for the unreleased docs: label, `next` path,
+          // and the banner the theme styles. `lastVersion` is deliberately not
+          // set, so the newest entry in versions.json -- the released docs --
+          // stays the default.
+          versions: {...recommendedVersions},
         },
         blog: false,
         theme: {
@@ -97,6 +105,10 @@ const config: Config = {
         {
           href: repoUrl,
           label: 'GitHub',
+          position: 'right',
+        },
+        {
+          type: 'docsVersionDropdown',
           position: 'right',
         },
       ],

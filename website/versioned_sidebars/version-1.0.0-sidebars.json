@@ -1,0 +1,21 @@
+{
+  "docsSidebar": [
+    "intro",
+    "getting-started",
+    "concepts",
+    {
+      "type": "category",
+      "label": "Package reference",
+      "collapsed": false,
+      "items": [
+        "reference/sun",
+        "reference/earth",
+        "reference/moon",
+        "reference/star",
+        "reference/constellation",
+        "reference/project",
+        "reference/errors"
+      ]
+    }
+  ]
+}
