@@ -15,6 +15,32 @@ jobs:
       pull-requests: read
     runs-on: ubuntu-latest
     steps:
+      # release-drafter derives the next version from the last PUBLISHED release
+      # and starts at 0.1.0 when there is none. This module is releasing at
+      # v1.0.0, and for a Go module the tag IS the version, so a 0.1.0 draft
+      # would publish the wrong import version. Force the first version; the
+      # check counts published releases only and ignores drafts, so the override
+      # lifts itself once v1.0.0 is published and its tag can anchor the bump.
+      - name: Force the first version
+        id: first_version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          published="$(gh api "repos/$GITHUB_REPOSITORY/releases" \
+            --paginate --jq '[.[] | select(.draft == false)] | length' \
+            | awk '{ total += $1 } END { print total + 0 }')"
+          if [ "$published" -eq 0 ]; then
+            echo "No published release yet; forcing v1.0.0 as the first version."
+            echo "version=1.0.0" >> "$GITHUB_OUTPUT"
+          else
+            echo "$published published release(s); release-drafter resolves it."
+            echo "version=" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: release-drafter/release-drafter@v6
+        with:
+          # Empty unless this is the first release, in which case release-drafter
+          # would otherwise resolve 0.1.0.
+          version: ${{ steps.first_version.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
