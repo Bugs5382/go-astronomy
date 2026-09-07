@@ -27,10 +27,10 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 // Moon.
 //
 // Ported from Jean Meeus, Astronomical Algorithms, 2nd ed.: chapter 48,
-// "Illuminated Fraction of the Moon's Disk", formulae (48.1) and the
-// low-accuracy (48.4); and chapter 49, "Phases of the Moon", formulae (49.1)
-// through (49.3) with the correction tables of pp. 351 and 352. The Go form
-// derives from soniakeys/meeus (moonillum, moonphase, base), MIT licensed.
+// "Illuminated Fraction of the Moon's Disk", formulae (48.1) through (48.3);
+// and chapter 49, "Phases of the Moon", formulae (49.1) through (49.3) with
+// the correction tables of pp. 351 and 352. The Go form derives from
+// soniakeys/meeus (moonillum, moonphase, base), MIT licensed.
 //
 // Only New and Full Moon are implemented, which is what this library needs. The
 // First and Last Quarter series is a separate table and is left out rather than
@@ -38,33 +38,37 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import "math"
 
+// kmPerAU is the astronomical unit in kilometres, IAU 2012 definition. The
+// solar series returns a distance in astronomical units and the lunar series
+// one in kilometres, and the phase angle needs the two in the same unit.
+const kmPerAU = 149597870.700
+
 // MoonPhaseAngle returns the Sun-Moon-Earth phase angle, in degrees in
-// [0, 360), at the given Julian ephemeris day, by the low-accuracy formula
-// (Meeus 48.4).
+// [0, 180], at the given Julian ephemeris day, by the accurate method of Meeus
+// chapter 48, formulae (48.2) and (48.3).
 //
-// The formula uses only the fundamental arguments, so it needs neither the
-// Moon's nor the Sun's position. It is about 0.2 degrees from the accurate
-// method, which is a few thousandths in the illuminated fraction it implies.
+// It combines three series rather than working from the fundamental arguments:
+// (48.2) gives the cosine of the geocentric elongation of the Moon from the Sun
+// out of the Moon's longitude and latitude and the Sun's longitude, and (48.3)
+// turns that elongation and the two distances into the phase angle. The
+// closed-form (48.4) is the cheap alternative and reaches several degrees of
+// error near New Moon; it is measured against this one in the package tests.
 //
-// Fixed against the source this port derives from: the cubic and quartic
-// coefficients of the fundamental arguments were written as untyped integer
-// divisions, which Go evaluates to exactly zero, so those terms were silently
-// absent. The quadratic coefficient of the Sun's mean anomaly is also corrected
-// to the -0.0001536 the book gives.
+// The angle is 0 at Full Moon, when the disk is fully lit, and approaches 180
+// at New Moon, when it is dark. It reaches neither limit: at both phases the
+// elongation is the Moon's ecliptic latitude, which is up to about 5.3 degrees,
+// so the angle stops that far short.
 func MoonPhaseAngle(jde float64) float64 {
+	moonLon, moonLat, moonDistKm := MoonPosition(jde)
 	t := J2000Century(jde)
-	d := pmod(Horner(t, 297.8501921, 445267.1114034, -0.0018819, 1.0/545868, -1.0/113065000), 360)
-	m := pmod(Horner(t, 357.5291092, 35999.0502909, -0.0001536, 1.0/24490000), 360)
-	mp := pmod(Horner(t, 134.9633964, 477198.8675055, 0.0087414, 1.0/69699, -1.0/14712000), 360)
-	dr, mr, mpr := radians(d), radians(m), radians(mp)
-	angle := 180 - d +
-		-6.289*math.Sin(mpr) +
-		2.100*math.Sin(mr) +
-		-1.274*math.Sin(2*dr-mpr) +
-		-0.658*math.Sin(2*dr) +
-		-0.214*math.Sin(2*mpr) +
-		-0.110*math.Sin(dr)
-	return pmod(angle, 360)
+	sunLon := SolarApparentLongitude(t)
+	sunDistKm := SolarRadius(t) * kmPerAU
+	// (48.2). The elongation lies in [0, 180], so its sine is never negative.
+	cosElong := math.Cos(radians(moonLat)) * math.Cos(radians(moonLon-sunLon))
+	sinElong := math.Sin(math.Acos(cosElong))
+	// (48.3). The numerator is positive, so the two-argument arctangent
+	// returns an angle in (0, 180) and the result needs no reduction.
+	return degrees(math.Atan2(sunDistKm*sinElong, moonDistKm-sunDistKm*cosElong))
 }
 
 // IlluminatedFraction returns the fraction of a body's disk that is lit, in

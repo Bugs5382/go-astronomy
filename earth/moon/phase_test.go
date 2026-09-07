@@ -24,23 +24,97 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
 import (
+	"math"
 	"testing"
 	"time"
 
 	"github.com/Bugs5382/go-astronomy/earth/moon"
 )
 
-// TestIlluminationMeeusExample anchors the illuminated fraction against the
-// meeus worked example for 1992 April 12, 0h UT (phase angle 68.88 degrees,
-// illuminated fraction 0.6801).
+// TestIlluminationMeeusExample anchors the phase angle and illuminated fraction
+// against the meeus worked example for 1992 April 12.0, which computes the
+// phase angle by the accurate method of chapter 48 and gets 69.0756 degrees and
+// 0.6786 illuminated. JPL Horizons gives 69.0782 and 0.678547 for the same
+// instant in Terrestrial Time.
 func TestIlluminationMeeusExample(t *testing.T) {
 	t.Parallel()
 	when := time.Date(1992, 4, 12, 0, 0, 0, 0, time.UTC)
-	if got, want := moon.PhaseAngle(when), 68.88; abs(got-want) > 0.05 {
-		t.Errorf("PhaseAngle = %.4f, want ~%.2f", got, want)
+	if got, want := moon.PhaseAngle(when), 69.078; abs(got-want) > 0.05 {
+		t.Errorf("PhaseAngle = %.4f, want ~%.3f", got, want)
 	}
-	if got, want := moon.Illumination(when), 0.6801; abs(got-want) > 0.001 {
-		t.Errorf("Illumination = %.4f, want ~%.4f", got, want)
+	if got, want := moon.Illumination(when), 0.678547; abs(got-want) > 0.001 {
+		t.Errorf("Illumination = %.4f, want ~%.6f", got, want)
+	}
+}
+
+// ephemerisPhase is the Moon's phase angle in degrees and illuminated fraction
+// of the disc, from the JPL Horizons system (target 301, center 500@399,
+// quantities "phi" and "Illu%"), tabulated in Terrestrial Time.
+//
+// The rows sample the synodic month from the New Moon of 2026 January to the
+// New Moon of 2026 February at two and a half day steps. Three of them fall
+// inside an hour of the January New Moon, which is where the phase angle is
+// worst conditioned: it approaches 180 degrees, where a small change in the
+// geometry is a large change in the angle.
+//
+// This library omits Delta-T deliberately, so the instants are handed to it as
+// the Terrestrial Time instants Horizons reports, unshifted. Comparing in TT
+// keeps that omission out of the measurement.
+var ephemerisPhase = []struct {
+	when                    time.Time
+	phaseAngle, illuminated float64
+}{
+	{time.Date(2026, 1, 18, 12, 0, 0, 0, time.UTC), 174.7589, 0.0020904},
+	{time.Date(2026, 1, 18, 18, 57, 36, 0, time.UTC), 176.5630, 0.0008993},
+	{time.Date(2026, 1, 18, 20, 24, 0, 0, time.UTC), 176.6326, 0.0008633},
+	{time.Date(2026, 1, 21, 0, 0, 0, 0, time.UTC), 154.5371, 0.0485679},
+	{time.Date(2026, 1, 23, 12, 0, 0, 0, time.UTC), 124.1524, 0.2193022},
+	{time.Date(2026, 1, 26, 0, 0, 0, 0, time.UTC), 92.4513, 0.4786145},
+	{time.Date(2026, 1, 28, 12, 0, 0, 0, time.UTC), 59.5299, 0.7535440},
+	{time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC), 25.9234, 0.9496898},
+	{time.Date(2026, 2, 2, 12, 0, 0, 0, time.UTC), 7.6440, 0.9955569},
+	{time.Date(2026, 2, 5, 0, 0, 0, 0, time.UTC), 38.5898, 0.8908157},
+	{time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC), 67.5186, 0.6911919},
+	{time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC), 94.9273, 0.4570539},
+	{time.Date(2026, 2, 12, 12, 0, 0, 0, time.UTC), 122.0666, 0.2345479},
+	{time.Date(2026, 2, 15, 0, 0, 0, 0, time.UTC), 150.1421, 0.0663685},
+}
+
+// TestPhaseAngleAgainstEphemeris measures the public phase angle, and the
+// illuminated fraction that follows from it, against a modern numerical
+// ephemeris across a synodic month.
+//
+// A caller may read the phase angle for something other than illumination --
+// the position angle of the illuminated limb, for instance -- where a degree
+// of error shows. Five hundredths of a degree is the standard the accurate
+// method of chapter 48 holds; the worst disagreement measured over these
+// instants is 0.013 degrees.
+func TestPhaseAngleAgainstEphemeris(t *testing.T) {
+	t.Parallel()
+	for _, e := range ephemerisPhase {
+		if got := moon.PhaseAngle(e.when); abs(got-e.phaseAngle) > 0.05 {
+			t.Errorf("PhaseAngle(%s) = %.4f, ephemeris %.4f", e.when, got, e.phaseAngle)
+		}
+		if got := moon.Illumination(e.when); abs(got-e.illuminated) > 2e-4 {
+			t.Errorf("Illumination(%s) = %.6f, ephemeris %.6f", e.when, got, e.illuminated)
+		}
+	}
+}
+
+// TestIlluminationDerivesFromPhaseAngle checks the two cannot disagree: the
+// illuminated fraction is exactly (1 + cos i) / 2 of the phase angle the same
+// call returns, not a second, independently computed quantity.
+func TestIlluminationDerivesFromPhaseAngle(t *testing.T) {
+	t.Parallel()
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < 30*24; i++ {
+		when := base.Add(time.Duration(i) * time.Hour)
+		angle := moon.PhaseAngle(when)
+		want := (1 + math.Cos(angle*math.Pi/180)) / 2
+		if got := moon.Illumination(when); math.Abs(got-want) > 1e-12 {
+			t.Fatalf("Illumination(%s) = %.15f, but (1+cos %.15f)/2 = %.15f",
+				when, got, angle, want)
+		}
 	}
 }
 
@@ -66,7 +140,12 @@ func TestPhaseRangesOverCycle(t *testing.T) {
 
 // TestNextNewIsNewMoon anchors NextNew against the meeus example (New Moon of
 // 1977 February 18, JDE 2443192.65118) and checks the returned instant is a
-// genuine new moon: minimal illumination and phase angle near 180 degrees.
+// genuine new moon: minimal illumination, and a phase angle matching what JPL
+// Horizons reports for that instant in Terrestrial Time, 175.7494 degrees.
+//
+// The angle falls short of 180 because the Moon is 4.2 degrees off the ecliptic
+// there: New Moon is the instant the two apparent longitudes agree, so the
+// remaining elongation is the Moon's latitude.
 func TestNextNewIsNewMoon(t *testing.T) {
 	t.Parallel()
 	from := time.Date(1977, 2, 10, 0, 0, 0, 0, time.UTC)
@@ -81,14 +160,19 @@ func TestNextNewIsNewMoon(t *testing.T) {
 	if k := moon.Illumination(got); k > 0.01 {
 		t.Errorf("illumination at new moon = %.4f, want ~0", k)
 	}
-	if p := moon.PhaseAngle(got); p < 178 {
-		t.Errorf("phase angle at new moon = %.4f, want ~180", p)
+	if p, want := moon.PhaseAngle(got), 175.7494; abs(p-want) > 0.05 {
+		t.Errorf("phase angle at new moon = %.4f, ephemeris %.4f", p, want)
 	}
 }
 
 // TestNextFullIsFullMoon checks NextFull returns a future instant within one
 // synodic month whose illumination is essentially full and whose phase angle is
 // near zero.
+//
+// The bound on the angle is the Moon's greatest ecliptic latitude, about 5.3
+// degrees. Full Moon is the instant the two apparent longitudes are 180 degrees
+// apart, so whatever latitude the Moon has then is left over as the phase
+// angle. JPL Horizons gives 2.0732 degrees for the instant this returns.
 func TestNextFullIsFullMoon(t *testing.T) {
 	t.Parallel()
 	from := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
@@ -102,8 +186,8 @@ func TestNextFullIsFullMoon(t *testing.T) {
 	if k := moon.Illumination(got); k < 0.99 {
 		t.Errorf("illumination at full moon = %.4f, want ~1", k)
 	}
-	if p := moon.PhaseAngle(got); p > 2 {
-		t.Errorf("phase angle at full moon = %.4f, want ~0", p)
+	if p := moon.PhaseAngle(got); p > 5.4 {
+		t.Errorf("phase angle at full moon = %.4f, want at most the lunar latitude", p)
 	}
 }
 

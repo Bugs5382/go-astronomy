@@ -50,7 +50,9 @@ func NextFull(t time.Time) time.Time   // next Full Moon after t
 `Phase` is one of the eight conventional named phases; `String` returns a lowercase snake_case name such as `waxing_crescent`. `Illumination` drives the illuminated-limb shape a consumer draws. These phase functions depend only on time, not on the observer.
 
 :::note Phase angle precision
-`PhaseAngle` uses the closed-form low-accuracy formula of Meeus chapter 48, which works from the lunar fundamental arguments alone. Its error reaches a few degrees near New Moon, where the phase angle approaches 180° and is a badly conditioned way to describe the geometry. `Illumination` is insensitive there — the cosine is flat at the ends of its range — and stays within about 0.0024 of an accurate ephemeris across a synodic month. Render from `Illumination`, not from `PhaseAngle`.
+`PhaseAngle` uses the accurate method of Meeus chapter 48, formulae (48.2) and (48.3), which combines the Moon's geocentric position with the Sun's apparent longitude and distance. Measured against JPL Horizons across a synodic month it agrees to better than 0.02°, and `Illumination` to better than 0.0002, including within an hour of New Moon.
+
+The angle reaches neither end of its range. At New Moon and at Full Moon the Moon's apparent longitude is aligned with the Sun's, so the elongation left over is the Moon's ecliptic latitude — up to about 5.3° — and the phase angle stops that far short of 180° and of 0°. Read `Illumination` for "how full is the disc"; it does reach 0 and 1.
 :::
 
 ## 🌒 Rise and set
