@@ -9,6 +9,10 @@ on:
     branches: [main]
     paths: ['.github/labels.yml']
 permissions:
+  # `actions/checkout` needs to read the repo to find `.github/labels.yml`;
+  # naming any permission here drops the rest to `none`, so `contents` has to
+  # be granted explicitly.
+  contents: read
   issues: write
 jobs:
   labeler:
