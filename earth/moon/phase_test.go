@@ -29,6 +29,8 @@ import (
 	"time"
 
 	"github.com/Bugs5382/go-astronomy/earth/moon"
+	"github.com/Bugs5382/go-astronomy/internal/ephemeris"
+	"github.com/Bugs5382/go-astronomy/internal/julian"
 )
 
 // TestIlluminationMeeusExample anchors the phase angle and illuminated fraction
@@ -259,5 +261,116 @@ func TestPhaseString(t *testing.T) {
 	}
 	if got := moon.Phase(99).String(); got == "" {
 		t.Error("out-of-range phase should still have a label")
+	}
+}
+
+// TestPhaseAtAgreesWithPhaseEvents is the invariant that names the phase from
+// the sky rather than from a clock: at the instant this package's own series
+// places a New Moon, the phase must be New, and likewise for Full.
+//
+// Slicing the cycle by age cannot guarantee this. SynodicMonth is a mean and
+// individual cycles run several hours either side of it, so an age-based
+// boundary drifts against the event it is supposed to straddle.
+func TestPhaseAtAgreesWithPhaseEvents(t *testing.T) {
+	t.Parallel()
+	from := time.Date(1977, 1, 1, 0, 0, 0, 0, time.UTC)
+	for lunation := 0; lunation < 60; lunation++ {
+		newMoon := moon.NextNew(from)
+		if got := moon.PhaseAt(newMoon); got != moon.New {
+			t.Errorf("PhaseAt(New Moon %s) = %v, want new", newMoon.Format(time.RFC3339), got)
+		}
+		full := moon.NextFull(from)
+		if got := moon.PhaseAt(full); got != moon.Full {
+			t.Errorf("PhaseAt(Full Moon %s) = %v, want full", full.Format(time.RFC3339), got)
+		}
+		from = newMoon.Add(36 * time.Hour)
+	}
+}
+
+// TestPhaseAtAdvancesInOrder walks a synodic month and checks the phases arrive
+// in their cycle order, each one following the last, wrapping once from waning
+// crescent back to new.
+func TestPhaseAtAdvancesInOrder(t *testing.T) {
+	t.Parallel()
+	start := moon.NextNew(time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC))
+	previous := moon.PhaseAt(start)
+	if previous != moon.New {
+		t.Fatalf("cycle did not start at new moon, got %v", previous)
+	}
+	wraps := 0
+	for hour := 1; hour <= 24*30; hour++ {
+		at := start.Add(time.Duration(hour) * time.Hour)
+		got := moon.PhaseAt(at)
+		switch {
+		case got == previous:
+		case got == previous+1:
+			previous = got
+		case previous == moon.WaningCrescent && got == moon.New:
+			wraps++
+			previous = got
+		default:
+			t.Fatalf("phase jumped from %v to %v at %s", previous, got, at.Format(time.RFC3339))
+		}
+	}
+	if wraps != 1 {
+		t.Errorf("cycle wrapped %d times over 30 days, want 1", wraps)
+	}
+}
+
+// elongationCrossing returns the instant, within a lunation of the New Moon
+// nearest year, at which the Moon's elongation reaches target degrees. It
+// bisects, which is enough for a test and keeps no root-finder in the library.
+func elongationCrossing(year, target float64) time.Time {
+	lo, hi := ephemeris.NewMoon(year)-1, ephemeris.NewMoon(year)+30
+	for i := 0; i < 60; i++ {
+		mid := (lo + hi) / 2
+		e := ephemeris.MoonElongation(mid)
+		// Near New Moon the value wraps, so read the far side as negative.
+		if target == 0 && e > 180 {
+			e -= 360
+		}
+		if e < target {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+	return julian.Time(hi)
+}
+
+// TestPhaseAtSectorCentresMatchIllumination checks the named phases sit where
+// the geometry puts them, using a quantity computed by a different route.
+//
+// PhaseAt reads the elongation; Illumination comes from the phase angle of Meeus
+// (48.3), which combines the two distances and the Moon's latitude. So agreement
+// between them is a real cross-check rather than a restatement: at the centre of
+// the New sector the disc must be dark, at the quarters half lit, and at Full
+// lit. The quarters land a touch over half because the Moon is a finite distance
+// away, not because the sector is misplaced.
+func TestPhaseAtSectorCentresMatchIllumination(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		elongation float64
+		want       moon.Phase
+		illum      float64
+		tolerance  float64
+	}{
+		{elongation: 0, want: moon.New, illum: 0, tolerance: 0.001},
+		{elongation: 90, want: moon.FirstQuarter, illum: 0.5, tolerance: 0.005},
+		{elongation: 180, want: moon.Full, illum: 1, tolerance: 0.001},
+		{elongation: 270, want: moon.LastQuarter, illum: 0.5, tolerance: 0.005},
+	}
+	for _, tc := range cases {
+		for year := 2020.0; year < 2027; year += 1.9 {
+			at := elongationCrossing(year, tc.elongation)
+			if got := moon.PhaseAt(at); got != tc.want {
+				t.Errorf("at elongation %.0f (%s): PhaseAt = %v, want %v",
+					tc.elongation, at.Format(time.RFC3339), got, tc.want)
+			}
+			if got := moon.Illumination(at); math.Abs(got-tc.illum) > tc.tolerance {
+				t.Errorf("at elongation %.0f (%s): illumination = %.4f, want %.1f +/- %.3f",
+					tc.elongation, at.Format(time.RFC3339), got, tc.illum, tc.tolerance)
+			}
+		}
 	}
 }

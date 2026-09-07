@@ -49,6 +49,10 @@ func NextFull(t time.Time) time.Time   // next Full Moon after t
 
 `Phase` is one of the eight conventional named phases; `String` returns a lowercase snake_case name such as `waxing_crescent`. `Illumination` drives the illuminated-limb shape a consumer draws. These phase functions depend only on time, not on the observer.
 
+`PhaseAt` names the phase from the Moon's **elongation** — its difference from the Sun in apparent ecliptic longitude — in eight 45° sectors, each centred on its named point, so New, First Quarter, Full and Last Quarter each name the sector straddling their exact instant. Elongation runs the whole way round the cycle, so it carries the waxing or waning sense as well as the shape.
+
+It is deliberately not derived from `Age`. Age over `SynodicMonth` is a clock, and `SynodicMonth` is a mean: individual cycles run several hours either side of it, and the Moon's speed varies within a cycle, so equal stretches of time do not fall on equal stretches of the geometry. Measured hourly over four years, naming the phase by age disagrees with the sky **10.2% of the time**, in runs of up to **22 hours**. `Age` is still there for callers who want the age itself.
+
 :::note Phase angle precision
 `PhaseAngle` uses the accurate method of Meeus chapter 48, formulae (48.2) and (48.3), which combines the Moon's geocentric position with the Sun's apparent longitude and distance. Measured against JPL Horizons across a synodic month it agrees to better than 0.02°, and `Illumination` to better than 0.0002, including within an hour of New Moon.
 

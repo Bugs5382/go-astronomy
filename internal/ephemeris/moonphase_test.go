@@ -345,3 +345,62 @@ func TestLunarPhaseSpacing(t *testing.T) {
 		prev = next
 	}
 }
+
+// TestMoonElongationAtPhaseEvents checks the elongation against the instants the
+// phase series places New and Full Moon at. Elongation is the difference in
+// apparent ecliptic longitude, so it is near 0 (or 360) at New Moon and near 180
+// at Full Moon -- unlike the phase angle, which stops short of both limits
+// because it carries the Moon's ecliptic latitude.
+func TestMoonElongationAtPhaseEvents(t *testing.T) {
+	t.Parallel()
+	for year := 1977.0; year < 2027; year += 3.7 {
+		newMoon := NewMoon(year)
+		e := MoonElongation(newMoon)
+		// Near 0 from either side.
+		if d := math.Min(e, 360-e); d > 0.5 {
+			t.Errorf("elongation at New Moon (JDE %.5f) = %.4f, want within 0.5 of 0", newMoon, e)
+		}
+		full := FullMoon(year)
+		if e := MoonElongation(full); math.Abs(e-180) > 0.5 {
+			t.Errorf("elongation at Full Moon (JDE %.5f) = %.4f, want within 0.5 of 180", full, e)
+		}
+	}
+}
+
+// TestMoonElongationRange checks the elongation stays inside [0, 360) and, unlike
+// the phase angle, does reach both ends of the cycle.
+func TestMoonElongationRange(t *testing.T) {
+	t.Parallel()
+	base := NewMoon(2026.0)
+	var low, high float64 = 360, 0
+	for step := 0.0; step < 30; step += 0.05 {
+		e := MoonElongation(base + step)
+		if e < 0 || e >= 360 {
+			t.Fatalf("elongation %.4f out of [0, 360) at JDE %.4f", e, base+step)
+		}
+		low = math.Min(low, e)
+		high = math.Max(high, e)
+	}
+	if low > 1 {
+		t.Errorf("elongation never came within 1 degree of 0 (min %.4f)", low)
+	}
+	if high < 359 {
+		t.Errorf("elongation never came within 1 degree of 360 (max %.4f)", high)
+	}
+}
+
+// TestMoonElongationIncreasesThroughCycle checks the elongation advances through
+// the cycle rather than folding, which is what lets it carry the waxing or waning
+// sense that the phase angle cannot.
+func TestMoonElongationIncreasesThroughCycle(t *testing.T) {
+	t.Parallel()
+	base := NewMoon(2026.0) + 1
+	previous := MoonElongation(base)
+	for step := 0.25; step < 28; step += 0.25 {
+		e := MoonElongation(base + step)
+		if e < previous {
+			t.Fatalf("elongation went backwards at JDE %.4f: %.4f then %.4f", base+step, previous, e)
+		}
+		previous = e
+	}
+}

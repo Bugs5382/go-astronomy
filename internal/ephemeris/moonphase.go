@@ -71,6 +71,25 @@ func MoonPhaseAngle(jde float64) float64 {
 	return degrees(math.Atan2(sunDistKm*sinElong, moonDistKm-sunDistKm*cosElong))
 }
 
+// MoonElongation returns the Moon's elongation from the Sun in apparent
+// ecliptic longitude, in degrees in [0, 360), at the given Julian ephemeris day.
+//
+// It is the plain difference in longitude, reduced to a full turn: near 0 at New
+// Moon, 90 at First Quarter, 180 at Full Moon and 270 at Last Quarter. Because
+// it runs the whole way round rather than folding at the ends, it says which
+// side of the cycle the Moon is on, which is what names a phase as waxing or
+// waning.
+//
+// This is not the phase angle. MoonPhaseAngle carries the Moon's ecliptic
+// latitude and is folded into [0, 180], so it stops short of both limits and
+// cannot tell waxing from waning. Nor is it the geocentric elongation of (48.2),
+// which is the true angular separation of the two bodies; that also folds.
+func MoonElongation(jde float64) float64 {
+	moonLon, _, _ := MoonPosition(jde)
+	sunLon := SolarApparentLongitude(J2000Century(jde))
+	return pmod(moonLon-sunLon, 360)
+}
+
 // IlluminatedFraction returns the fraction of a body's disk that is lit, in
 // [0, 1], given the phase angle in degrees (Meeus 48.1). It is 1 at a phase
 // angle of zero, when the disk is fully lit, and 0 at 180 degrees.
