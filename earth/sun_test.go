@@ -28,116 +28,208 @@ import (
 	"testing"
 	"time"
 
-	meeusbase "github.com/soniakeys/meeus/v3/base"
-	meeuscoord "github.com/soniakeys/meeus/v3/coord"
-	meeusjulian "github.com/soniakeys/meeus/v3/julian"
-	"github.com/soniakeys/meeus/v3/sidereal"
-	"github.com/soniakeys/meeus/v3/solar"
-	"github.com/soniakeys/unit"
-
 	astronomy "github.com/Bugs5382/go-astronomy"
 	"github.com/Bugs5382/go-astronomy/earth"
+	"github.com/Bugs5382/go-astronomy/internal/julian"
 )
 
 const deg2rad = math.Pi / 180
 
-// expectedAltitude computes the Sun's geometric altitude independently of the
-// internal coordinates package, using plain spherical trigonometry on the
-// apparent solar equatorial position and mean sidereal time. It is an
-// independent cross-check of the horizontal transform, not a copy of it.
-func expectedAltitude(t time.Time, latDeg, lngEastDeg float64) float64 {
-	jd := meeusjulian.TimeToJD(t.UTC())
-	ra, dec := solar.ApparentEquatorial(jd)
-	gst := sidereal.Mean(jd).Hour() * 15 // degrees
-	hourAngle := (gst + lngEastDeg - ra.Deg()) * deg2rad
-	latR := latDeg * deg2rad
-	decR := dec.Deg() * deg2rad
-	sinAlt := math.Sin(latR)*math.Sin(decR) + math.Cos(latR)*math.Cos(decR)*math.Cos(hourAngle)
-	return math.Asin(sinAlt) / deg2rad
+// sunPinned holds the Sun's horizontal position and apparent diameter, in
+// degrees, as this library computes them. The values pin the observer/instant
+// grid below so a change to the solar model, the sidereal time, or the
+// horizontal transform is caught to the twelfth decimal even when the change
+// is far too small for the authority checks in this file to see. The independent
+// accuracy checks are TestSunPositionAgainstEphemeris and, for the solar model
+// itself, the Meeus worked examples in internal/julian and internal/coordinates.
+var sunPinned = []struct {
+	observer string
+	when     string
+	alt      float64
+	az       float64
+	diameter float64
+}{
+	{"brooklyn", "1982-05-03T16:00:00Z", 62.544850983238, 151.629835938767, 0.528783418360},
+	{"brooklyn", "1992-10-13T00:00:00Z", -19.805149655993, 276.873206851426, 0.534377178337},
+	{"brooklyn", "2026-09-04T12:30:00Z", 22.569224342345, 100.470257889259, 0.528637893271},
+	{"brooklyn", "2026-12-21T17:00:00Z", 25.868856430940, 181.540584096381, 0.541931950967},
+	{"quito", "1982-05-03T16:00:00Z", 66.396216772283, 46.892906474449, 0.528783418360},
+	{"quito", "1992-10-13T00:00:00Z", -14.786334846923, 261.898336794566, 0.534377178337},
+	{"quito", "2026-09-04T12:30:00Z", 19.098256542253, 82.463863458471, 0.528637893271},
+	{"quito", "2026-12-21T17:00:00Z", 66.559612996597, 173.036886015029, 0.541931950967},
+	{"tromso", "1982-05-03T16:00:00Z", 18.266454619805, 265.982376288943, 0.528783418360},
+	{"tromso", "1992-10-13T00:00:00Z", -26.463069772713, 24.917710410375, 0.534377178337},
+	{"tromso", "2026-09-04T12:30:00Z", 25.060025301520, 209.485013994187, 0.528637893271},
+	{"tromso", "2026-12-21T17:00:00Z", -23.419513633873, 265.488604378038, 0.541931950967},
+	{"auckland", "1982-05-03T16:00:00Z", -36.733821407836, 97.882000002493, 0.528783418360},
+	{"auckland", "1992-10-13T00:00:00Z", 60.889627486793, 3.700761911476, 0.534377178337},
+	{"auckland", "2026-09-04T12:30:00Z", -60.123624497945, 175.005032421332, 0.528637893271},
+	{"auckland", "2026-12-21T17:00:00Z", -0.570092097517, 120.300338652959, 0.541931950967},
 }
 
-// meeusPipeline reproduces the exact wiring earth.SunPosition is expected to use:
-// apparent solar equatorial position, mean Greenwich sidereal time, and the
-// meeus horizontal transform with west-positive longitude and a 180 degree
-// azimuth rotation to clockwise-from-north.
-func meeusPipeline(t time.Time, latDeg, lngEastDeg float64) (alt, az, diam float64) {
-	jd := meeusjulian.TimeToJD(t.UTC())
-	ra, dec := solar.ApparentEquatorial(jd)
-	gst := sidereal.Mean(jd).Hour() * 15
-	st := unit.TimeFromHour(gst / 15)
-	a, h := meeuscoord.EqToHz(
-		ra,
-		dec,
-		unit.AngleFromDeg(latDeg),
-		unit.AngleFromDeg(-lngEastDeg),
-		st,
-	)
-	az = math.Mod(a.Deg()+180+360, 360)
-	alt = h.Deg()
-	r := solar.Radius(meeusbase.J2000Century(jd))
-	diam = 2 * 959.63 / 3600 / r
+// namedObservers resolves the observer fixtures used by the pinned tables.
+var namedObservers = map[string]astronomy.Observer{
+	"brooklyn": brooklyn,
+	"quito":    quito,
+	"tromso":   tromso,
+	"auckland": auckland,
+}
+
+// mustParse parses an RFC 3339 instant or fails the test.
+func mustParse(t *testing.T, s string) time.Time {
+	t.Helper()
+	when, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		t.Fatalf("parse %q: %v", s, err)
+	}
+	return when
+}
+
+// TestSunPositionPinnedValues locks the Sun's altitude, azimuth, and apparent
+// diameter to the values in sunPinned across four observers and four instants
+// spanning both hemispheres, the Arctic, the equator, and the anti-meridian.
+func TestSunPositionPinnedValues(t *testing.T) {
+	t.Parallel()
+	for _, c := range sunPinned {
+		obs, ok := namedObservers[c.observer]
+		if !ok {
+			t.Fatalf("unknown observer %q", c.observer)
+		}
+		when := mustParse(t, c.when)
+		pos := earth.SunPosition(obs, when)
+		if math.Abs(pos.Altitude-c.alt) > 1e-9 {
+			t.Errorf("%s %s altitude = %.12f, want %.12f", c.observer, c.when, pos.Altitude, c.alt)
+		}
+		if math.Abs(pos.Azimuth-c.az) > 1e-9 {
+			t.Errorf("%s %s azimuth = %.12f, want %.12f", c.observer, c.when, pos.Azimuth, c.az)
+		}
+		if math.Abs(float64(pos.Diameter)-c.diameter) > 1e-12 {
+			t.Errorf("%s %s diameter = %.12f, want %.12f", c.observer, c.when, float64(pos.Diameter), c.diameter)
+		}
+		if pos.Azimuth < 0 || pos.Azimuth >= 360 {
+			t.Errorf("%s %s azimuth = %v out of [0,360)", c.observer, c.when, pos.Azimuth)
+		}
+	}
+}
+
+// ephemerisSun is the Sun's apparent geocentric right ascension and declination
+// in degrees, and its geocentric distance in astronomical units, as published by
+// the JPL Horizons system (target 10, center 500@399, apparent RA/Dec referred
+// to the true equator and equinox of date). These are independent of this
+// library and of the algorithms it implements.
+var ephemerisSun = []struct {
+	when     string
+	ra       float64
+	dec      float64
+	distance float64
+}{
+	{"1982-05-03T16:00:00Z", 40.43755, 15.70779, 1.00818792359644},
+	{"1992-10-13T00:00:00Z", 198.37875, -7.78407, 0.99760832548205},
+	{"2026-09-04T12:30:00Z", 163.40180, 7.05982, 1.00847421895488},
+	{"2026-12-21T17:00:00Z", 269.82259, -23.43732, 0.98374267926946},
+	{"2026-01-15T00:00:00Z", 296.76541, -21.16059, 0},
+	{"2026-03-20T17:00:00Z", 0.08484, 0.03689, 0},
+	{"2026-06-21T10:00:00Z", 90.06897, 23.43792, 0},
+}
+
+// horizontalFromEquatorial converts an equatorial position to altitude and
+// azimuth with plain spherical trigonometry, independent of the internal
+// coordinates package. Azimuth is measured clockwise from true north.
+func horizontalFromEquatorial(raDeg, decDeg, gstDeg, latDeg, lngEastDeg float64) (alt, az float64) {
+	h := (gstDeg + lngEastDeg - raDeg) * deg2rad
+	lat := latDeg * deg2rad
+	dec := decDeg * deg2rad
+	sinAlt := math.Sin(lat)*math.Sin(dec) + math.Cos(lat)*math.Cos(dec)*math.Cos(h)
+	alt = math.Asin(sinAlt) / deg2rad
+	// Azimuth from the south, measured westward (Meeus 13.5), rotated to
+	// clockwise from north.
+	azSouth := math.Atan2(math.Sin(h), math.Cos(h)*math.Sin(lat)-math.Tan(dec)*math.Cos(lat))
+	az = math.Mod(azSouth/deg2rad+180+360, 360)
 	return
 }
 
-func TestSunPositionMatchesMeeusPipeline(t *testing.T) {
+// TestSunPositionAgainstEphemeris checks the Earth-vantage solar chain against
+// the JPL Horizons apparent right ascension and declination, converted to the
+// horizontal frame by independent spherical trigonometry. The sidereal time is
+// this library's own, itself anchored to Meeus examples 12.a and 12.b in
+// internal/julian.
+//
+// The tolerance is 0.02 degrees, about 72 arc seconds. That is the error budget
+// of the low-accuracy solar series of Meeus chapter 25 (roughly 0.01 degrees in
+// longitude) plus the deliberate omission of Delta-T, which shifts the Sun by
+// about 0.0007 degrees per minute of clock difference. Both are documented
+// limits of this library, not defects, and both are far below its stated
+// arcminute-class accuracy.
+func TestSunPositionAgainstEphemeris(t *testing.T) {
 	t.Parallel()
-	instants := []time.Time{
-		time.Date(1982, 5, 3, 16, 0, 0, 0, time.UTC),
-		time.Date(1992, 10, 13, 0, 0, 0, 0, time.UTC),
-		time.Date(2026, 9, 4, 12, 30, 0, 0, time.UTC),
-		time.Date(2026, 12, 21, 17, 0, 0, 0, time.UTC),
-	}
+	const tol = 0.02
 	observers := []astronomy.Observer{brooklyn, quito, tromso, auckland}
-	for _, obs := range observers {
-		for _, when := range instants {
+	for _, e := range ephemerisSun {
+		when := mustParse(t, e.when)
+		gst := julian.GreenwichSiderealTime(when)
+		for _, obs := range observers {
 			pos := earth.SunPosition(obs, when)
-			wantAlt, wantAz, wantDiam := meeusPipeline(when, obs.Lat, obs.Lng)
-			if math.Abs(pos.Altitude-wantAlt) > 1e-9 {
-				t.Errorf("%v %v altitude = %.12f, want %.12f", obs, when, pos.Altitude, wantAlt)
+			wantAlt, wantAz := horizontalFromEquatorial(e.ra, e.dec, gst, obs.Lat, obs.Lng)
+			if math.Abs(pos.Altitude-wantAlt) > tol {
+				t.Errorf("%v %s altitude = %.6f, ephemeris %.6f", obs, e.when, pos.Altitude, wantAlt)
 			}
-			if math.Abs(pos.Azimuth-wantAz) > 1e-9 {
-				t.Errorf("%v %v azimuth = %.12f, want %.12f", obs, when, pos.Azimuth, wantAz)
+			// Azimuth is ill-conditioned near the zenith and near the pole,
+			// where a tiny altitude error swings the bearing widely, so it is
+			// only checked where the geometry is well behaved.
+			if math.Abs(pos.Altitude) > 5 && math.Abs(pos.Altitude) < 80 {
+				d := math.Abs(pos.Azimuth - wantAz)
+				if d > 180 {
+					d = 360 - d
+				}
+				if d > 0.1 {
+					t.Errorf("%v %s azimuth = %.6f, ephemeris %.6f", obs, e.when, pos.Azimuth, wantAz)
+				}
 			}
-			if math.Abs(float64(pos.Diameter)-wantDiam) > 1e-12 {
-				t.Errorf("%v %v diameter = %.12f, want %.12f", obs, when, float64(pos.Diameter), wantDiam)
-			}
-			if pos.Azimuth < 0 || pos.Azimuth >= 360 {
-				t.Errorf("%v %v azimuth = %v out of [0,360)", obs, when, pos.Azimuth)
+			if e.distance > 0 {
+				wantDiam := 2 * 959.63 / 3600 / e.distance
+				if math.Abs(float64(pos.Diameter)-wantDiam) > 1e-4 {
+					t.Errorf("%v %s diameter = %.6f, ephemeris %.6f", obs, e.when, float64(pos.Diameter), wantDiam)
+				}
 			}
 		}
 	}
 }
 
-func TestSunPositionAltitudeIndependent(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		obs astronomy.Observer
-		t   time.Time
-	}{
-		{brooklyn, time.Date(1982, 5, 3, 16, 0, 0, 0, time.UTC)},
-		{quito, time.Date(2026, 3, 20, 17, 0, 0, 0, time.UTC)},
-		{tromso, time.Date(2026, 6, 21, 10, 0, 0, 0, time.UTC)},
-		{auckland, time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)},
+// ephemerisSunDecMay1982 is the Sun's apparent declination in degrees at six
+// hour intervals through 1982 May 3 UTC, from JPL Horizons. The declination
+// changes by only about 0.07 degrees over each interval and does so almost
+// linearly, so interpolating between these anchors is accurate to well under a
+// thousandth of a degree.
+var ephemerisSunDecMay1982 = [5]float64{15.51116, 15.58512, 15.65881, 15.73223, 15.80537}
+
+// ephemerisSunDec returns the Sun's apparent declination at an instant on
+// 1982 May 3 UTC, linearly interpolated from the published anchors.
+func ephemerisSunDec(when time.Time) float64 {
+	day := time.Date(1982, 5, 3, 0, 0, 0, 0, time.UTC)
+	x := when.UTC().Sub(day).Hours() / 6
+	if x < 0 {
+		x = 0
 	}
-	for _, c := range cases {
-		pos := earth.SunPosition(c.obs, c.t)
-		want := expectedAltitude(c.t, c.obs.Lat, c.obs.Lng)
-		if math.Abs(pos.Altitude-want) > 1e-4 {
-			t.Errorf("%v %v altitude = %.6f, want %.6f", c.obs, c.t, pos.Altitude, want)
-		}
+	if x > 4 {
+		x = 4
 	}
+	i := int(x)
+	if i > 3 {
+		i = 3
+	}
+	f := x - float64(i)
+	return ephemerisSunDecMay1982[i] + f*(ephemerisSunDecMay1982[i+1]-ephemerisSunDecMay1982[i])
 }
 
 // TestSunPositionSolarNoonAltitude verifies the physical identity that at
 // meridian transit the Sun's altitude equals 90 - |lat - dec|, with the
-// declination taken from meeus at the transit instant. Transit is located by
-// scanning the day for peak altitude.
+// declination taken from the JPL Horizons anchors at the transit instant.
+// Transit is located by scanning the day for peak altitude.
 func TestSunPositionSolarNoonAltitude(t *testing.T) {
 	t.Parallel()
 	observers := []astronomy.Observer{brooklyn, quito, auckland}
-	date := time.Date(1982, 5, 3, 0, 0, 0, 0, time.UTC)
+	start := time.Date(1982, 5, 3, 0, 0, 0, 0, time.UTC)
 	for _, obs := range observers {
-		start := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 		var peak astronomy.Position
 		var peakTime time.Time
 		peak.Altitude = -1000
@@ -149,14 +241,13 @@ func TestSunPositionSolarNoonAltitude(t *testing.T) {
 				peakTime = when
 			}
 		}
-		// declination at transit
-		_, dec := solar.ApparentEquatorial(meeusjulian.TimeToJD(peakTime))
-		want := 90 - math.Abs(obs.Lat-dec.Deg())
+		dec := ephemerisSunDec(peakTime)
+		want := 90 - math.Abs(obs.Lat-dec)
 		if math.Abs(peak.Altitude-want) > 0.1 {
 			t.Errorf("%v transit altitude = %.4f, want ~%.4f", obs, peak.Altitude, want)
 		}
-		// northern-hemisphere transit is due south (azimuth ~180) when dec < lat.
-		if obs.Lat > 0 && dec.Deg() < obs.Lat {
+		// Northern-hemisphere transit is due south (azimuth ~180) when dec < lat.
+		if obs.Lat > 0 && dec < obs.Lat {
 			if math.Abs(peak.Azimuth-180) > 1.0 {
 				t.Errorf("%v transit azimuth = %.4f, want ~180", obs, peak.Azimuth)
 			}

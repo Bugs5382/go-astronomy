@@ -27,10 +27,9 @@ import (
 	"sort"
 	"time"
 
-	meeusjulian "github.com/soniakeys/meeus/v3/julian"
-	"github.com/soniakeys/meeus/v3/solstice"
-
 	astronomy "github.com/Bugs5382/go-astronomy"
+	"github.com/Bugs5382/go-astronomy/internal/ephemeris"
+	"github.com/Bugs5382/go-astronomy/internal/julian"
 )
 
 // Season is one of the four astronomical seasons, bounded by the equinoxes and
@@ -100,10 +99,10 @@ func northernSeasonStarts(year int) [4]struct {
 		when   time.Time
 		season Season
 	}{
-		{meeusjulian.JDToTime(solstice.March(year)).UTC(), Spring},
-		{meeusjulian.JDToTime(solstice.June(year)).UTC(), Summer},
-		{meeusjulian.JDToTime(solstice.September(year)).UTC(), Fall},
-		{meeusjulian.JDToTime(solstice.December(year)).UTC(), Winter},
+		{julian.Time(ephemeris.MarchEquinox(year)), Spring},
+		{julian.Time(ephemeris.JuneSolstice(year)), Summer},
+		{julian.Time(ephemeris.SeptemberEquinox(year)), Fall},
+		{julian.Time(ephemeris.DecemberSolstice(year)), Winter},
 	}
 }
 

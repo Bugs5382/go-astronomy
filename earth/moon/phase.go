@@ -27,12 +27,7 @@ import (
 	"math"
 	"time"
 
-	meeusbase "github.com/soniakeys/meeus/v3/base"
-	meeusjulian "github.com/soniakeys/meeus/v3/julian"
-	"github.com/soniakeys/meeus/v3/moonillum"
-	"github.com/soniakeys/meeus/v3/moonphase"
-
-	"github.com/Bugs5382/go-astronomy/internal/angles"
+	"github.com/Bugs5382/go-astronomy/internal/ephemeris"
 	"github.com/Bugs5382/go-astronomy/internal/julian"
 )
 
@@ -42,11 +37,11 @@ import (
 const SynodicMonth = 29.530588853
 
 // lunationsPerYear is the mean number of lunations in a Julian year, the factor
-// the meeus phase functions use to map a decimal year to a lunation number
-// (Astronomical Algorithms, chapter 49). lunationYear is its reciprocal: the
-// decimal-year step that advances the meeus phase functions by exactly one
-// lunation, so a search steps cleanly to the adjacent New or Full Moon rather
-// than risking the same rounded lunation.
+// the phase series uses to map a decimal year to a lunation number (Meeus,
+// Astronomical Algorithms, chapter 49). lunationYear is its reciprocal: the
+// decimal-year step that advances the phase series by exactly one lunation, so
+// a search steps cleanly to the adjacent New or Full Moon rather than risking
+// the same rounded lunation.
 const (
 	lunationsPerYear = 12.3685
 	lunationYear     = 1.0 / lunationsPerYear
@@ -102,15 +97,15 @@ func (p Phase) String() string {
 }
 
 // newMoonBefore returns the julian ephemeris day of the most recent New Moon at
-// or before jde. It starts from the New Moon the meeus model places nearest jde
-// and, if that falls after jde, steps back one whole lunation at a time until it
+// or before jde. It starts from the New Moon the series places nearest jde and,
+// if that falls after jde, steps back one whole lunation at a time until it
 // lands at or before jde.
 func newMoonBefore(jde float64) float64 {
-	y := meeusbase.JDEToJulianYear(jde)
-	n := moonphase.New(y)
+	y := ephemeris.JDEToJulianYear(jde)
+	n := ephemeris.NewMoon(y)
 	for n > jde {
 		y -= lunationYear
-		n = moonphase.New(y)
+		n = ephemeris.NewMoon(y)
 	}
 	return n
 }
@@ -123,10 +118,13 @@ func Age(t time.Time) float64 {
 }
 
 // PhaseAngle returns the Sun-Moon-Earth phase angle at t, in degrees in [0, 180].
-// It is 0 at Full Moon, when the Moon is fully lit, and 180 at New Moon, when the
-// disc is dark. The value comes from the meeus low-accuracy phase-angle model.
+// It is 0 at Full Moon, when the Moon is fully lit, and 180 at New Moon, when
+// the disc is dark. The value comes from the low-accuracy phase-angle formula
+// of Meeus chapter 48, which reaches a few degrees of error near New Moon,
+// where the phase angle is a badly conditioned description of the geometry.
+// Illumination, which is what a caller renders, is insensitive there.
 func PhaseAngle(t time.Time) float64 {
-	i := angles.Normalize(moonillum.PhaseAngle3(julian.Date(t)).Deg())
+	i := ephemeris.MoonPhaseAngle(julian.Date(t))
 	if i > 180 {
 		i = 360 - i
 	}
@@ -137,7 +135,7 @@ func PhaseAngle(t time.Time) float64 {
 // [0, 1]: 0 at New Moon and 1 at Full Moon. It is derived from the phase angle
 // as (1 + cos i) / 2.
 func Illumination(t time.Time) float64 {
-	return meeusbase.Illuminated(moonillum.PhaseAngle3(julian.Date(t)))
+	return ephemeris.IlluminatedFraction(ephemeris.MoonPhaseAngle(julian.Date(t)))
 }
 
 // PhaseAt returns the named phase of the Moon at t. The synodic cycle is divided
@@ -152,25 +150,25 @@ func PhaseAt(t time.Time) Phase {
 
 // NextNew returns the instant of the first New Moon strictly after t, in UTC.
 func NextNew(t time.Time) time.Time {
-	return nextPhaseEvent(t, moonphase.New)
+	return nextPhaseEvent(t, ephemeris.NewMoon)
 }
 
 // NextFull returns the instant of the first Full Moon strictly after t, in UTC.
 func NextFull(t time.Time) time.Time {
-	return nextPhaseEvent(t, moonphase.Full)
+	return nextPhaseEvent(t, ephemeris.FullMoon)
 }
 
-// nextPhaseEvent returns the first instant strictly after t at which the meeus
-// phase function event occurs. event maps a decimal year to the ephemeris day of
-// the event nearest that year; when the nearest event is at or before t, the
-// search steps forward one whole lunation at a time until it lands after t.
+// nextPhaseEvent returns the first instant strictly after t at which the phase
+// event occurs. event maps a decimal year to the ephemeris day of the event
+// nearest that year; when the nearest event is at or before t, the search steps
+// forward one whole lunation at a time until it lands after t.
 func nextPhaseEvent(t time.Time, event func(float64) float64) time.Time {
 	jde := julian.Date(t)
-	y := meeusbase.JDEToJulianYear(jde)
+	y := ephemeris.JDEToJulianYear(jde)
 	e := event(y)
 	for e <= jde {
 		y += lunationYear
 		e = event(y)
 	}
-	return meeusjulian.JDToTime(e)
+	return julian.Time(e)
 }

@@ -30,24 +30,31 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 import (
 	"time"
 
-	meeusjulian "github.com/soniakeys/meeus/v3/julian"
-	"github.com/soniakeys/meeus/v3/nutation"
-	"github.com/soniakeys/meeus/v3/sidereal"
-
 	"github.com/Bugs5382/go-astronomy/internal/angles"
+	"github.com/Bugs5382/go-astronomy/internal/ephemeris"
 )
 
 // Date returns the Julian Date for the given instant. The instant is always
 // interpreted in UTC, so a zoned time is converted before conversion.
 func Date(t time.Time) float64 {
-	return meeusjulian.TimeToJD(t.UTC())
+	return ephemeris.TimeToJD(t)
+}
+
+// Time returns the UTC instant of a Julian Date. It is the inverse of Date.
+func Time(jd float64) time.Time {
+	return ephemeris.JDToTime(jd)
+}
+
+// JulianYear returns the Julian year corresponding to an instant, the epoch
+// form the precession and lunar phase series take.
+func JulianYear(t time.Time) float64 {
+	return ephemeris.JDEToJulianYear(Date(t))
 }
 
 // GreenwichSiderealTime returns the Greenwich mean sidereal time for the given
 // instant, in degrees in the range [0, 360).
 func GreenwichSiderealTime(t time.Time) float64 {
-	// unit.Time.Hour is in [0, 24); scaling by 15 yields degrees.
-	return angles.Normalize(sidereal.Mean(Date(t)).Hour() * 15)
+	return ephemeris.MeanSiderealTime(Date(t))
 }
 
 // LocalSiderealTime returns the local mean sidereal time for an observer at the
@@ -59,5 +66,5 @@ func LocalSiderealTime(t time.Time, lonEastDeg float64) float64 {
 // MeanObliquity returns the mean obliquity of the ecliptic for the given
 // instant, in degrees, following the IAU 1980 polynomial.
 func MeanObliquity(t time.Time) float64 {
-	return nutation.MeanObliquity(Date(t)).Deg()
+	return ephemeris.MeanObliquity(Date(t))
 }

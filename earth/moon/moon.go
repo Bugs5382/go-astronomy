@@ -46,13 +46,12 @@ import (
 	"math"
 	"time"
 
-	"github.com/soniakeys/meeus/v3/moonposition"
-
 	apperr "github.com/Bugs5382/go-apperr"
 	astronomy "github.com/Bugs5382/go-astronomy"
 	"github.com/Bugs5382/go-astronomy/earth"
 	"github.com/Bugs5382/go-astronomy/internal/angles"
 	"github.com/Bugs5382/go-astronomy/internal/coordinates"
+	"github.com/Bugs5382/go-astronomy/internal/ephemeris"
 	"github.com/Bugs5382/go-astronomy/internal/julian"
 )
 
@@ -108,14 +107,14 @@ func validateObserver(obs astronomy.Observer) error {
 // altitude, adequate at the library's arcminute-class accuracy.
 func topocentric(obs astronomy.Observer, t time.Time) (coordinates.Horizontal, float64) {
 	jde := julian.Date(t)
-	lam, bet, dist := moonposition.Position(jde)
+	lam, bet, dist := ephemeris.MoonPosition(jde)
 	obl := julian.MeanObliquity(t)
 	eq := coordinates.EclipticToEquatorial(
-		coordinates.Ecliptic{Lon: lam.Deg(), Lat: bet.Deg()}, obl)
+		coordinates.Ecliptic{Lon: lam, Lat: bet}, obl)
 	gst := julian.GreenwichSiderealTime(t)
 	hz := coordinates.EquatorialToHorizontal(eq, obs.Lat, obs.Lng, gst)
 
-	parDeg := moonposition.Parallax(dist).Deg()
+	parDeg := ephemeris.MoonParallax(dist)
 	hz.Altitude -= parDeg * math.Cos(angles.DegToRad(hz.Altitude))
 
 	semiDeg := moonRadiusRatio * parDeg

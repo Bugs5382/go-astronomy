@@ -26,11 +26,9 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 import (
 	"time"
 
-	meeusbase "github.com/soniakeys/meeus/v3/base"
-	"github.com/soniakeys/meeus/v3/solar"
-
 	astronomy "github.com/Bugs5382/go-astronomy"
 	"github.com/Bugs5382/go-astronomy/internal/coordinates"
+	"github.com/Bugs5382/go-astronomy/internal/ephemeris"
 	"github.com/Bugs5382/go-astronomy/internal/julian"
 	"github.com/Bugs5382/go-astronomy/sun"
 )
@@ -44,21 +42,21 @@ import (
 //
 // This is the Earth vantage on the Sun. Every part of it is Earth-specific: the
 // Sun's apparent right ascension and declination come from the Earth's orbit
-// (the meeus solar model is Earth-based), the horizontal transform needs the
+// (the solar model is Earth-based), the horizontal transform needs the
 // observer's latitude, longitude, and Earth sidereal time, and the apparent
 // diameter follows from the Earth-Sun distance. Only the size-versus-distance
 // relation, sun.ApparentDiameter, is universal Sun physics.
 func SunPosition(obs astronomy.Observer, t time.Time) astronomy.Position {
 	jd := julian.Date(t)
-	ra, dec := solar.ApparentEquatorial(jd)
+	ra, dec := ephemeris.SolarApparentEquatorial(jd)
 	gst := julian.GreenwichSiderealTime(t)
 
 	hz := coordinates.EquatorialToHorizontal(
-		coordinates.Equatorial{RA: ra.Deg(), Dec: dec.Deg()},
+		coordinates.Equatorial{RA: ra, Dec: dec},
 		obs.Lat, obs.Lng, gst,
 	)
 
-	distanceAU := solar.Radius(meeusbase.J2000Century(jd))
+	distanceAU := ephemeris.SolarRadius(ephemeris.J2000Century(jd))
 
 	return astronomy.Position{
 		Horizontal: astronomy.Horizontal{

@@ -16,7 +16,7 @@ sidebar_position: 1
 - 🌍 **Universal Sun plus per-body traits.** Only the Sun is universal to the solar system; each body package (currently `earth`, including `earth/moon`) owns that body's observer, atmosphere, and naming traits. Stars and constellations are universal catalogs.
 - 🧵 **Stateless and concurrency-safe.** `time.Time` is always a parameter, never captured at construction, so the same instance serves many callers at once. A service can compute a distinct sky per site visitor.
 - 📐 **Discs, not points.** Sun and Moon positions are the center of the disc, always paired with an angular diameter, so a consumer can size the disc and reason about alignment and overlap (eclipses, occultations) from the data alone.
-- 🎯 **Arcminute-class accuracy.** The math is built on [`soniakeys/meeus`](https://github.com/soniakeys/meeus), a mature implementation of Jean Meeus' *Astronomical Algorithms*. Nutation, ΔT, and leap seconds are deliberately omitted — they sit below that precision floor.
+- 🎯 **Arcminute-class accuracy.** The math is an in-house implementation of Jean Meeus' *Astronomical Algorithms*, with no third-party ephemeris dependency. Each algorithm is anchored to a worked example from the book and measured against JPL Horizons. ΔT and leap seconds are deliberately omitted — they sit below that precision floor.
 
 ## 🧭 How the packages fit together
 
@@ -33,7 +33,7 @@ Adding a future body (for example `mars/`) would not change `sun`, `star`, or `c
 
 ## 🙏 Credits and licensing
 
-- The algorithmic foundation is Jean Meeus' *Astronomical Algorithms*, via [`soniakeys/meeus`](https://github.com/soniakeys/meeus) (with `soniakeys/unit`). MIT-licensed.
+- The algorithmic foundation is Jean Meeus' *Astronomical Algorithms*. The series were ported from [`soniakeys/meeus`](https://github.com/soniakeys/meeus), which the library no longer depends on. MIT-licensed.
 - The embedded star catalog is a curated subset of the [HYG database](https://codeberg.org/astronexus/hyg) (Hipparcos-Yale-Gliese), used under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 - The constellation boundaries are the IAU boundaries of Eugène Delporte (1930), digitized by Nancy Roman (1987) as [VizieR VI/42](https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=VI/42).
 
