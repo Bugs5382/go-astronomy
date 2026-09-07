@@ -32,105 +32,148 @@ import (
 // ephemerisMoonPhase is the Moon's phase angle in degrees and illuminated
 // fraction of the disk, from the JPL Horizons system (target 301, center
 // 500@399, quantities "phi" and "Illu%") evaluated in Terrestrial Time.
+//
+// The rows sample one synodic month, the New Moon of 2026 January to the New
+// Moon of 2026 February, at two and a half day steps, with three instants
+// inside an hour of the New Moon itself, where the phase angle is worst
+// conditioned. The instant of Meeus example 48.a, the New Moon of Meeus
+// example 49.a, and one instant from a later month are carried as well.
 var ephemerisMoonPhase = []struct {
 	jde, phaseAngle, illuminated float64
 }{
+	{2443192.65118, 175.7494, 0.0013753},
 	{2448724.5, 69.0782, 0.6785466},
+	{2461059.0, 174.7589, 0.0020904},
+	{2461059.29, 176.5630, 0.0008993},
+	{2461059.35, 176.6326, 0.0008633},
 	{2461059.5, 176.2131, 0.0010917},
+	{2461061.5, 154.5371, 0.0485679},
+	{2461064.0, 124.1524, 0.2193022},
+	{2461066.5, 92.4513, 0.4786145},
+	{2461069.0, 59.5299, 0.7535440},
+	{2461071.5, 25.9234, 0.9496898},
+	{2461074.0, 7.6440, 0.9955569},
+	{2461076.5, 38.5898, 0.8908157},
+	{2461079.0, 67.5186, 0.6911919},
+	{2461081.5, 94.9273, 0.4570539},
+	{2461084.0, 122.0666, 0.2345479},
+	{2461086.5, 150.1421, 0.0663685},
+	{2461088.16667, 169.7425, 0.0079913},
 	{2461212.5, 100.8320, 0.4060354},
 }
 
-// accuratePhaseAngle computes the Sun-Moon-Earth phase angle, in degrees, by
-// the accurate method of Meeus (48.2) and (48.3), from the ported lunar and
-// solar series. It is written out here rather than exported because this
-// library does not need it; its purpose is to measure the low-accuracy formula
-// and, more usefully, to check the whole ported chain -- lunar position, solar
-// longitude, and solar distance together -- against an outside ephemeris.
-func accuratePhaseAngle(jde float64) float64 {
-	moonLon, moonLat, moonDistKm := MoonPosition(jde)
-	tc := J2000Century(jde)
-	sunLon := SolarApparentLongitude(tc)
-	// The astronomical unit, IAU 2012 definition, in kilometres.
-	const kmPerAU = 149597870.700
-	sunDistKm := SolarRadius(tc) * kmPerAU
-	// Cosine of the geocentric elongation of the Moon from the Sun (48.2).
-	cosElong := math.Cos(radians(moonLat)) * math.Cos(radians(moonLon-sunLon))
-	sinElong := math.Sin(math.Acos(cosElong))
-	// (48.3)
-	return degrees(math.Atan2(sunDistKm*sinElong, moonDistKm-sunDistKm*cosElong))
+// lowAccuracyPhaseAngle computes the Sun-Moon-Earth phase angle, in degrees in
+// [0, 360), by the closed-form low-accuracy formula of Meeus (48.4), which
+// works from the fundamental arguments alone and uses neither the Moon's nor
+// the Sun's position.
+//
+// It is kept here, out of the package's own code, only to measure what the
+// accurate method buys: the library computes the phase angle by (48.2) and
+// (48.3) instead. The arguments D, M and M' are the fundamental arguments of
+// chapter 47, so moonArguments supplies them rather than a second copy of the
+// polynomials; only the leading term needs D back in degrees.
+func lowAccuracyPhaseAngle(jde float64) float64 {
+	dr, mr, mpr, _ := moonArguments(J2000Century(jde))
+	angle := 180 - pmod(degrees(dr), 360) +
+		-6.289*math.Sin(mpr) +
+		2.100*math.Sin(mr) +
+		-1.274*math.Sin(2*dr-mpr) +
+		-0.658*math.Sin(2*dr) +
+		-0.214*math.Sin(2*mpr) +
+		-0.110*math.Sin(dr)
+	return pmod(angle, 360)
 }
 
-// TestAccuratePhaseAngleAgainstEphemeris checks the ported lunar position, solar
-// longitude, and solar distance series jointly, by combining them into the
-// accurate phase angle and comparing that against a modern numerical
-// ephemeris. Agreement to a hundredth of a degree is a much tighter statement
-// about the port than any one of the three series gives on its own.
-func TestAccuratePhaseAngleAgainstEphemeris(t *testing.T) {
-	t.Parallel()
-	for _, e := range ephemerisMoonPhase {
-		got := accuratePhaseAngle(e.jde)
-		if math.Abs(got-e.phaseAngle) > 0.01 {
-			t.Errorf("JDE %v: accurate phase angle = %.4f, ephemeris %.4f", e.jde, got, e.phaseAngle)
-		}
-		k := IlluminatedFraction(got)
-		if math.Abs(k-e.illuminated) > 1e-4 {
-			t.Errorf("JDE %v: illuminated fraction = %.6f, ephemeris %.6f", e.jde, k, e.illuminated)
-		}
+// foldPhaseAngle reduces an angle in [0, 360) to the [0, 180] a phase angle
+// physically occupies. Only the low-accuracy formula needs it; (48.3) resolves
+// the quadrant itself.
+func foldPhaseAngle(deg float64) float64 {
+	if deg > 180 {
+		return 360 - deg
 	}
+	return deg
 }
 
-// TestMoonPhaseAngleAgainstEphemeris measures the low-accuracy phase-angle
-// formula against a modern numerical ephemeris. Meeus example 48.a computes the
-// same instant by the accurate method and gets 69.0756 degrees, which the
-// ephemeris confirms.
+// TestMoonPhaseAngleAgainstEphemeris checks the phase angle, and the
+// illuminated fraction that follows from it, against a modern numerical
+// ephemeris across a synodic month.
 //
-// Formula (48.4) trades accuracy for a closed form in the fundamental arguments
-// alone: it uses neither the Moon's nor the Sun's position. Its error in the
-// angle reaches about 3.4 degrees, and it is worst near New Moon, where the
-// phase angle approaches 180 degrees and is a badly conditioned way to describe
-// the geometry. The quantity a caller actually renders, the illuminated
-// fraction, is insensitive there: the same 3.4 degree error is worth 0.0024 of
-// illumination, because the cosine is flat at the ends of its range.
-//
-// This is a property of the algorithm, not of the port. Whether to move the
-// public phase angle onto the accurate method is a separate question from
-// replacing the dependency, and the accurate method is checked above.
+// The check is a joint statement about three ported series at once -- the
+// lunar position, the solar longitude, and the solar distance -- because the
+// accurate method combines all three. Agreement to a few hundredths of a
+// degree is a much tighter statement about the port than any one of them gives
+// alone.
 func TestMoonPhaseAngleAgainstEphemeris(t *testing.T) {
 	t.Parallel()
+	// The worst disagreement measured over these instants is 0.0131 degrees
+	// in the angle and 0.00009 in the fraction.
+	const angleTol, fractionTol = 0.02, 2e-4
 	for _, e := range ephemerisMoonPhase {
 		got := MoonPhaseAngle(e.jde)
-		if got > 180 {
-			got = 360 - got
-		}
-		if math.Abs(got-e.phaseAngle) > 4 {
+		if math.Abs(got-e.phaseAngle) > angleTol {
 			t.Errorf("JDE %v: phase angle = %.4f, ephemeris %.4f", e.jde, got, e.phaseAngle)
 		}
-		k := IlluminatedFraction(MoonPhaseAngle(e.jde))
-		if math.Abs(k-e.illuminated) > 0.005 {
+		k := IlluminatedFraction(got)
+		if math.Abs(k-e.illuminated) > fractionTol {
 			t.Errorf("JDE %v: illuminated fraction = %.6f, ephemeris %.6f", e.jde, k, e.illuminated)
 		}
 	}
 }
 
-// TestMoonPhaseAngleTracksAccurateMethod bounds the low-accuracy formula against
-// the accurate one over a full synodic month, which is the claim the comment
-// above rests on: at most a few degrees in the angle, and a few thousandths in
-// the illuminated fraction.
-func TestMoonPhaseAngleTracksAccurateMethod(t *testing.T) {
+// TestMoonPhaseAngleBeatsLowAccuracyFormula records why the library computes
+// the phase angle the expensive way. Both methods are measured against the same
+// ephemeris table: the closed form is out by degrees, the accurate method by
+// hundredths of a degree.
+//
+// The closed form is worst near New Moon, where the phase angle approaches 180
+// degrees and is a badly conditioned way to describe the geometry. The
+// illuminated fraction is insensitive there, because the cosine is flat at the
+// ends of its range, which is why the closed form was serviceable for as long
+// as illumination was all anyone read.
+func TestMoonPhaseAngleBeatsLowAccuracyFormula(t *testing.T) {
+	t.Parallel()
+	var worstLow, worstAccurate, worstLowFraction float64
+	for _, e := range ephemerisMoonPhase {
+		low := foldPhaseAngle(lowAccuracyPhaseAngle(e.jde))
+		worstLow = math.Max(worstLow, math.Abs(low-e.phaseAngle))
+		worstAccurate = math.Max(worstAccurate, math.Abs(MoonPhaseAngle(e.jde)-e.phaseAngle))
+		worstLowFraction = math.Max(worstLowFraction,
+			math.Abs(IlluminatedFraction(low)-e.illuminated))
+	}
+	// The closed form reaches 4.14 degrees over this table, at the New Moon of
+	// 1977 February.
+	if worstLow < 3 {
+		t.Errorf("closed form was out by only %.4f degrees; the two methods should differ by more", worstLow)
+	}
+	if worstAccurate > 0.02 {
+		t.Errorf("accurate method was out by %.4f degrees", worstAccurate)
+	}
+	if worstAccurate > worstLow/100 {
+		t.Errorf("accurate method %.4f is not two orders better than the closed form %.4f",
+			worstAccurate, worstLow)
+	}
+	// The same error is worth only thousandths of the illuminated fraction.
+	if worstLowFraction > 0.0025 {
+		t.Errorf("closed-form illuminated fraction was out by %.6f, more than expected", worstLowFraction)
+	}
+}
+
+// TestMoonPhaseAngleTracksLowAccuracyFormula bounds the two methods against each
+// other continuously, at hourly steps over a synodic month, rather than at the
+// tabulated instants alone. The closed form stays within a few degrees in the
+// angle and a few thousandths in the illuminated fraction.
+func TestMoonPhaseAngleTracksLowAccuracyFormula(t *testing.T) {
 	t.Parallel()
 	var worstAngle, worstFraction float64
-	for i := 0; i < 30*48; i++ {
-		jde := 2461059.0 + float64(i)/48
-		low := MoonPhaseAngle(jde)
-		folded := low
-		if folded > 180 {
-			folded = 360 - folded
-		}
-		accurate := accuratePhaseAngle(jde)
-		worstAngle = math.Max(worstAngle, math.Abs(folded-accurate))
+	for i := 0; i < 30*24; i++ {
+		jde := 2461059.0 + float64(i)/24
+		low := lowAccuracyPhaseAngle(jde)
+		accurate := MoonPhaseAngle(jde)
+		worstAngle = math.Max(worstAngle, math.Abs(foldPhaseAngle(low)-accurate))
 		worstFraction = math.Max(worstFraction,
 			math.Abs(IlluminatedFraction(low)-IlluminatedFraction(accurate)))
 	}
+	// Measured: 3.36 degrees and 0.0023 over this month.
 	if worstAngle > 4 {
 		t.Errorf("worst phase-angle disagreement over a month was %.4f degrees", worstAngle)
 	}
@@ -144,25 +187,25 @@ func TestMoonPhaseAngleTracksAccurateMethod(t *testing.T) {
 	}
 }
 
-// TestMoonPhaseAngleRange checks the phase angle is reduced to one revolution
-// and sweeps the full cycle over a synodic month.
+// TestMoonPhaseAngleRange checks the phase angle stays inside the [0, 180] it
+// physically occupies and sweeps the cycle over a synodic month.
+//
+// It does not reach either limit. At New Moon and at Full Moon the geocentric
+// elongation of the Moon from the Sun is its ecliptic latitude, up to about
+// 5.3 degrees, so the angle stops that far short of 180 and of 0.
 func TestMoonPhaseAngleRange(t *testing.T) {
 	t.Parallel()
 	var sawNew, sawFull bool
 	for i := 0; i < 30*24; i++ {
 		jde := 2461059.0 + float64(i)/24
 		a := MoonPhaseAngle(jde)
-		if a < 0 || a >= 360 {
-			t.Fatalf("phase angle %v out of [0,360) at JDE %v", a, jde)
+		if a < 0 || a > 180 {
+			t.Fatalf("phase angle %v out of [0,180] at JDE %v", a, jde)
 		}
-		folded := a
-		if folded > 180 {
-			folded = 360 - folded
-		}
-		if folded > 178 {
+		if a > 174 {
 			sawNew = true
 		}
-		if folded < 2 {
+		if a < 3 {
 			sawFull = true
 		}
 	}
