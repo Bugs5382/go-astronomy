@@ -1,6 +1,6 @@
-# 🔭 go-astronomy
+# go-astronomy 🔭
 
-> Observer-aware Sun, Moon, star, and constellation positions for Go — altitude/azimuth, twilight bands, arc tracks, and moon phases for any `(latitude, longitude, timezone, time)`.
+> 🌍 Observer-aware Sun, Moon, star, and constellation positions for Go — altitude/azimuth, twilight bands, arc tracks, and moon phases for any `(latitude, longitude, timezone, time)`.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/Bugs5382/go-astronomy.svg)](https://pkg.go.dev/github.com/Bugs5382/go-astronomy)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Bugs5382/go-astronomy)](https://goreportcard.com/report/github.com/Bugs5382/go-astronomy)
