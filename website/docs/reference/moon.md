@@ -68,6 +68,28 @@ func NextSet(obs astronomy.Observer, t time.Time) (time.Time, bool, error)
 
 `NextRise` and `NextSet` return the first instant strictly after `t` at which the Moon's upper limb crosses the horizon, and a boolean that is false when no crossing occurs within the search window (which can happen at high latitudes, where the Moon can stay above or below the horizon for many days). The search spans a full synodic month. Both return a coded error for an out-of-range observer.
 
+## 🌓 Bright limb
+
+```go
+type BrightLimb struct {
+	PositionAngle float64 // from celestial north through east, [0, 360)
+	Parallactic   float64 // parallactic angle at the Moon, (-180, 180]
+	ZenithAngle   float64 // PositionAngle - Parallactic: from "up" on the observer's sky, [0, 360)
+}
+
+func BrightLimbAt(obs astronomy.Observer, t time.Time) (BrightLimb, error)
+```
+
+`BrightLimbAt` says which way the lit side faces. It is the direction from the Moon toward the Sun on the observer's sky (Meeus 48.5), from both bodies' topocentric apparent places, and it points at the Sun even when the Sun is below the horizon.
+
+All three angles turn counter-clockwise as the observer sees the sky, so 90 is to the left of the reference direction and 270 to the right:
+
+- `PositionAngle` is measured from the direction of the north celestial pole, through east. It is a property of the sky, referred to the true equator and equinox of date.
+- `Parallactic` is the angle from celestial north to the direction of the zenith at the Moon (Meeus 14.1). It is negative while the Moon is east of the meridian.
+- `ZenithAngle` folds the parallactic angle in. It is measured from "up" on the observer's sky, which is what a screen needs: with the top of the screen as up, 0 means the lit side faces the top, 90 the left, 180 the bottom, and 270 the right.
+
+The angles are always defined, because the Sun and the Moon never coincide exactly. Near New and Full Moon, with less than about 0.1% or more than about 99.9% of the disc lit (see `Illumination`), there is no visible bright limb to orient and the angle swings quickly, so treat it as undefined there. Against JPL Horizons DE441 (`PsAng`, turned from the J2000 pole to the pole of date) the position angle agrees to within 0.01°.
+
 ## 📈 Track
 
 ```go
