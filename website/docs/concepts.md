@@ -52,6 +52,10 @@ Pass a zone-aware `time.Time` on every call. The library computes internally in 
 
 At high latitudes the Sun may not cross the horizon on a given day. That is an explicit state, never a nil panic or a `-1` sentinel. `SunTimes.Polar()` returns a `PolarState` of `MidnightSun` (Sun up all day) or `PolarNight` (Sun down all day) with a boolean that is false on an ordinary day. Absence in general is explicit throughout the API: `(value, bool)` or `(value, error)` where a result may not exist, for example no sunrise during a polar day.
 
+## ⛰️ Height and the horizon
+
+`Observer.Elevation` moves the horizon, not the sky. From height the sea horizon sits below the astronomical horizon by the dip, so rise and set move while positions stay put (the height changes the Sun's and Moon's parallax by under an arc second). Only sunrise and sunset move by default, following the USNO definition of twilight; `Segmentation.WithTwilightDip` moves every level. The core never looks a height up; the optional `elevation/openmeteo` adapter does, and it is the only package that reaches the network.
+
 ## 🎯 Accuracy
 
 The target is amateur, arcminute-class accuracy, using an in-house implementation of the Meeus algorithms. The Sun and Moon are computed on Terrestrial Time, with ΔT taken from the IERS leap-second table, and include nutation and the observer's parallax; against JPL Horizons DE441 the Moon is good to about 10″ and the Sun, from the VSOP87 series, to about 2″. Star positions still omit nutation and aberration. Do not rely on the library for higher-precision ephemeris work.

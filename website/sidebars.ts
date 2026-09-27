@@ -16,6 +16,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'reference/sun',
         'reference/earth',
+        'reference/elevation',
         'reference/moon',
         'reference/star',
         'reference/constellation',

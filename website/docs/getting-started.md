@@ -74,6 +74,9 @@ func main() {
 
 `SunPosition` never returns an error: an altitude below the horizon is a valid geometric answer. The functions that resolve a civil day (`NewSunTimes`) or the Moon's topocentric position validate the observer and return a coded error when the latitude or longitude is out of range — see [Errors](./reference/errors.md).
 
+
+An `Observer` is a latitude and longitude in degrees (positive north and east), a time zone (nil means UTC), and an optional `Elevation` in metres above sea level (`astronomy.MinElevation` to `astronomy.MaxElevation`, −1000 to 9000). Leave `Elevation` at zero for sea-level answers. A height makes the Sun and Moon rise earlier and set later by the horizon dip; see [`earth`](./reference/earth.md) and [`elevation`](./reference/elevation.md).
+
 ## 🖥️ Projecting to a canvas
 
 The library emits degrees. When you want pixels, hand the already-computed altitude/azimuth to the `project` package. It owns no ephemeris and no colors — only screen geometry.

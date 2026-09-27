@@ -98,17 +98,48 @@ func Refraction(apparentAltDeg float64) float64
 ## ⛰️ Observer elevation and the horizon dip
 
 ```go
+// in the root astronomy package
+type Observer struct {
+	Lat, Lng  float64
+	TZ        *time.Location
+	Elevation float64 // metres above sea level, default 0
+}
+const MinElevation, MaxElevation = -1000, 9000 // metres
+
+// in earth
 const DipArcminPerRootMetre = 1.76
 func HorizonDip(elevationM float64) float64
 func ValidElevation(h float64) bool
 var ErrInvalidElevation error
 ```
 
-`astronomy.Observer` carries an optional `Elevation` in metres above sea level. Zero, the default, is sea level and reproduces the sea-level answers exactly. From height the sea horizon sits below the astronomical horizon by the dip, `1.76′ × √h` (the Nautical Almanac value, which includes standard terrestrial refraction), so the Sun rises earlier and sets later: at Denver (1609 m) by about eight minutes. `HorizonDip` returns it in degrees and is zero at or below sea level.
+`astronomy.Observer` carries an optional `Elevation` in metres above sea level. Zero, the default, is sea level and reproduces the sea-level answers exactly. From height the sea horizon sits below the astronomical horizon by the dip, `1.76′ × √h` (the Nautical Almanac value, which includes standard terrestrial refraction), so the Sun rises earlier and sets later: at Denver (1609 m) by about seven minutes in June. `HorizonDip` returns it in degrees and is zero at or below sea level.
+
+```go
+denver, _ := time.LoadLocation("America/Denver")
+sea := astronomy.Observer{Lat: 39.74, Lng: -104.99, TZ: denver}
+high := sea
+high.Elevation = 1609 // metres above sea level
+
+date := time.Date(2027, 6, 21, 12, 0, 0, 0, denver)
+a, _ := earth.NewSunTimes(sea, date)
+b, _ := earth.NewSunTimes(high, date)
+// Sunrise, the start of the sunrise band, comes 7.3 minutes earlier at height.
+```
+
+| height | dip | example |
+| --- | --- | --- |
+| 10 m | 0.09° | a coastal town |
+| 100 m | 0.29° | a hill |
+| 700 m | 0.78° | a plateau city |
+| 1609 m | 1.18° | Denver |
+| 3640 m | 1.77° | La Paz |
 
 By default only sunrise and sunset move. `DefaultSegmentation` marks the sunrise and sunset crossing (−0.833°) and the top of the sunrise band (−0.3°) as `DipCorrected`, and the segmentation's `Horizon` always takes the dip. The civil, nautical, and astronomical twilight levels do not: by the USNO convention they are the Sun's depression below the astronomical horizon. `WithTwilightDip` returns a copy with every level dip-corrected, for a consumer that wants the twilight bands to track the horizon the observer actually sees.
 
-Two limits are worth knowing. The dip assumes an unobstructed sea horizon: it is right on a mountaintop or a coast and optimistic in a valley, where terrain hides the true horizon and sunrise comes later, not earlier. And an elevation looked up from a digital elevation model is a grid-cell average rather than the ground under the observer. Heights from −1000 m to 9000 m are accepted; anything else, or a non-finite value, is rejected with `ErrInvalidElevation` (code 7011). The height also enters the Sun's and the Moon's parallax, where it is worth under an arc second. To look an elevation up from a coordinate, see [`elevation`](./elevation.md).
+Two limits are worth knowing. The dip assumes an unobstructed sea horizon: it is right on a mountaintop or a coast and optimistic in a valley, where terrain hides the true horizon and sunrise comes later, not earlier. And an elevation looked up from a digital elevation model is a grid-cell average rather than the ground under the observer. Heights from −1000 m to 9000 m are accepted; anything else, or a non-finite value, is rejected with `ErrInvalidElevation` (code 7011). The height also enters the Sun's and the Moon's parallax, where it is worth under an arc second.
+
+**Accuracy and sources.** The coefficient is the Nautical Almanac's observed dip, `1.76′ × √h`. JPL Horizons' "true visual horizon" rise and set (`R_T_S_ONLY='TVH'`) use the purely geometric dip, `1.93′ × √h`, which ignores terrestrial refraction. At Denver and La Paz this library therefore rises up to about 30 s later and sets up to about 75 s earlier than Horizons TVH. The package tests pin both the sea-level agreement (within Horizons' one-minute step) and that bounded gap at height. To look an elevation up from a coordinate, see [`elevation`](./elevation.md).
 
 ## ❄️ Polar states
 

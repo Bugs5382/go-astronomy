@@ -70,8 +70,54 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 - 🖥️ **Pixel-agnostic projection** — the `project` package maps `(altitude°, azimuth°, timeProgress)` to `(x, y)` with selectable strategies (`XMode` = time-progress or azimuth; `YMode` = normalized-by-peak or geometric) and a configurable horizon anchor.
 - 🧭 **Configurable segmentation** — twilight thresholds and band labels are data. Earth defaults ship (−18/−12/−6°, golden hour, sunrise/sunset), and `earth.NewSunTimesWith` takes a `Segmentation` to redefine them wholesale.
 - 🕛 **Seamless midnight rollover** — `earth.SegmentAt` answers "which band, and how far through it, at `now`" and stitches across midnight with no gap. Callers ask only for `now`, never for the previous or next day.
-- ⛰️ **Observer elevation** — `Observer.Elevation` (metres) lowers the horizon by the dip, `1.76′ × √h`, so sunrise, sunset, and moonrise/moonset move with height (about eight minutes at Denver). Twilight levels stay on the astronomical horizon by default; `Segmentation.WithTwilightDip` opts them in. The optional `elevation/openmeteo` adapter looks a height up from the Open-Meteo elevation API; the core never touches the network.
+- ⛰️ **Observer elevation** — `Observer.Elevation` (metres) lowers the horizon by the dip, `1.76′ × √h`, so sunrise, sunset, and moonrise/moonset move with height (about seven minutes at Denver in June). Twilight levels stay on the astronomical horizon by default; `Segmentation.WithTwilightDip` opts them in. The optional `elevation/openmeteo` adapter looks a height up from the Open-Meteo elevation API; the core never touches the network.
 - 🧵 **Stateless & concurrency-safe** — every call takes the observer and `time.Time`; nothing is captured at construction, so the same instance serves many visitors at once.
+
+## ⛰️ Observer elevation
+
+`Observer.Elevation` is the observer's height above sea level, in metres. Zero, the default, is sea level and gives exactly the sea-level answers. From height the sea horizon lies below the astronomical horizon by the dip, so the Sun and Moon rise earlier and set later: about seven minutes at Denver (1609 m) in June.
+
+### Setting a height
+
+```go
+denver, _ := time.LoadLocation("America/Denver")
+obs := astronomy.Observer{Lat: 39.74, Lng: -104.99, TZ: denver, Elevation: 1609}
+
+fmt.Printf("dip %.3f°\n", earth.HorizonDip(obs.Elevation)) // dip 1.177°
+
+day, err := earth.NewSunTimes(obs, time.Date(2027, 6, 21, 12, 0, 0, 0, denver))
+if err != nil {
+	panic(err) // a non-finite height, or one outside -1000 to 9000 m, is rejected
+}
+for _, s := range day.Segments() {
+	if s.Label == earth.LabelSunrise {
+		fmt.Println("sunrise:", s.From.Format(time.Kitchen))
+	}
+}
+```
+
+The dip is `1.76′ × √h` (`earth.DipArcminPerRootMetre`), the observed dip from the Nautical Almanac, which includes standard terrestrial refraction. It assumes an unobstructed sea horizon: right on a mountaintop or a coast, optimistic in a valley where terrain hides the horizon. An elevation looked up from a digital elevation model is a grid-cell average, not the ground under the observer.
+
+### Twilight and the dip
+
+By the USNO convention, only sunrise and sunset move. Civil, nautical, and astronomical twilight are the Sun's depression below the astronomical horizon, so `earth.DefaultSegmentation` marks only the sunrise and sunset levels `DipCorrected`. To move every level with the horizon the observer actually sees, opt in:
+
+```go
+day, err := earth.NewSunTimesWith(obs, date, earth.DefaultSegmentation.WithTwilightDip())
+```
+
+`earth/moon`'s `NextRise` and `NextSet` take the same dip.
+
+### Looking a height up
+
+The core never reaches the network. The optional `elevation` package defines a `Lookup` interface, and `elevation/openmeteo` implements it with the free [Open-Meteo elevation API](https://open-meteo.com/en/docs/elevation-api) (Copernicus DEM, 90 m), using only `net/http`:
+
+```go
+client := openmeteo.New() // caches each 0.01° cell in process, with no expiry
+obs, err := elevation.Fill(ctx, client, astronomy.Observer{Lat: 39.74, Lng: -104.99, TZ: denver})
+```
+
+A durable cache shared across processes is the consumer's: read the in-process map with `client.Cached` and seed it with `client.Store`.
 
 ## 📋 Requirements
 
