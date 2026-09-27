@@ -17,7 +17,7 @@ type Observer struct {
 }
 ```
 
-An observer's height above sea level is optional. From height the sea horizon lies below the astronomical horizon by the dip, so the Sun and Moon rise earlier and set later, and the height enters their parallax (under an arc second). Every function that takes an `Observer` uses its height: `earth.NewSunTimes`, `earth.SegmentAt`, `earth.SunPosition`, and the Moon's `Position`, `NextRise`, and `NextSet`.
+An observer's height above sea level is optional. From height the sea horizon lies below the astronomical horizon by the dip, so the Sun and Moon rise earlier and set later, and the height enters their parallax (under an arc second). Every function that takes an `Observer` uses its height: `earth.NewSunTimes`, `earth.SegmentAt`, `earth.SunPosition`, the Moon's `Position`, `NextRise`, and `NextSet`, and every planet package's `Position`, `NextRise`, `NextSet`, and `NextTransit`.
 
 ## 📏 Height
 

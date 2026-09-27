@@ -115,7 +115,7 @@ const HorizonAltitude = -0.5667
 var ErrInvalidLatitude, ErrInvalidLongitude error
 ```
 
-`NextRise` and `NextSet` find the planet's centre crossing `HorizonAltitude`, the geometric altitude of the refracted horizon (34 arc minutes of standard refraction; the discs are arc seconds, so the centre stands in for the planet). Every error is go-apperr coded: an out-of-range observer carries `CodeInvalidLatitude` or `CodeInvalidLongitude`.
+`NextRise` and `NextSet` find the planet's centre crossing `HorizonAltitude`, the geometric altitude of the refracted horizon (34 arc minutes of standard refraction; the discs are arc seconds, so the centre stands in for the planet). For an observer above sea level the horizon is lowered further by the dip, `earth.HorizonDip(obs.Height)`, so a planet rises earlier and sets later: at 5000 ft by 5 to 10 minutes at mid latitudes. Every error is go-apperr coded: an out-of-range observer carries `CodeInvalidLatitude` or `CodeInvalidLongitude`, and a NaN or infinite `Height` gives `astronomy.ErrInvalidHeight`.
 
 ## 🌌 Every planet (`planet/all`)
 

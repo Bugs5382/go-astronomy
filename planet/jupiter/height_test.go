@@ -1,4 +1,4 @@
-package planetary
+package jupiter_test
 
 /*
 MIT License
@@ -24,19 +24,15 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
 import (
-	apperr "github.com/Bugs5382/go-apperr"
-	astronomy "github.com/Bugs5382/go-astronomy"
-	"github.com/Bugs5382/go-astronomy/planet"
+	"testing"
+
+	"github.com/Bugs5382/go-astronomy/internal/planettest"
+	"github.com/Bugs5382/go-astronomy/planet/jupiter"
 )
 
-// validateObserver returns the coded error for an out-of-range observer.
-func validateObserver(obs astronomy.Observer) error {
-	if obs.Lat < -90 || obs.Lat > 90 {
-		return apperr.Coded(astronomy.CodeInvalidLatitude, planet.ErrInvalidLatitude)
-	}
-	if obs.Lng < -180 || obs.Lng > 180 {
-		return apperr.Coded(astronomy.CodeInvalidLongitude, planet.ErrInvalidLongitude)
-	}
-	// A NaN or infinite height; any real height is used as given.
-	return obs.Height.Err()
+// TestObserverHeight checks the observer's height: omitted is sea level, NaN
+// and infinity are rejected, and a height moves rise and set by the dip.
+func TestObserverHeight(t *testing.T) {
+	t.Parallel()
+	planettest.CheckHeight(t, jupiter.Planet)
 }

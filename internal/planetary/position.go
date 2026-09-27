@@ -42,7 +42,7 @@ func (s *Spec) position(obs astronomy.Observer, t time.Time) planet.Result {
 
 	ra, dec := ephemeris.EclToEq(g.Lon, g.Lat, ephemeris.TrueObliquity(jde))
 	gst := julian.ApparentSiderealTime(t)
-	ra, dec, topoKm := ephemeris.Topocentric(ra, dec, g.Delta*ephemeris.KmPerAU, obs.Lat, 0, gst+obs.Lng)
+	ra, dec, topoKm := ephemeris.Topocentric(ra, dec, g.Delta*ephemeris.KmPerAU, obs.Lat, obs.Height.Meters(), gst+obs.Lng)
 	hz := coordinates.EquatorialToHorizontal(coordinates.Equatorial{RA: ra, Dec: dec}, obs.Lat, obs.Lng, gst)
 
 	// Elongation from the triangle Sun, Earth, planet (Meeus 48.2 in its
