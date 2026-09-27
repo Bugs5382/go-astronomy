@@ -31,6 +31,7 @@ import (
 
 	apperr "github.com/Bugs5382/go-apperr"
 	astronomy "github.com/Bugs5382/go-astronomy"
+	"github.com/Bugs5382/go-astronomy/earth"
 	"github.com/Bugs5382/go-astronomy/earth/moon"
 )
 
@@ -62,6 +63,46 @@ func TestMoonRiseSetTakeTheDip(t *testing.T) {
 		s1, _, _ := moon.NextSet(high, s0.Add(-30*time.Minute))
 		if d := s1.Sub(s0); d < 4*time.Minute || d > 15*time.Minute {
 			t.Errorf("set at %s: height moved it later by %v, want 4 to 15 minutes", s0.Format(time.RFC3339), d)
+		}
+	}
+}
+
+// TestMoonRefractionThinsWithHeight checks the Moon's refraction follows the
+// standard atmosphere at the observer's height (issue 68). At moonrise from
+// 1609 m the geometric centre sits at the scaled horizon refraction plus the
+// semidiameter plus the dip below the horizon, about 0.08 degrees higher than
+// the sea-level refraction would put it; and ApparentPosition lifts the Moon
+// by the scaled refraction, not the sea-level one.
+func TestMoonRefractionThinsWithHeight(t *testing.T) {
+	t.Parallel()
+	high := astronomy.Observer{Lat: 39.74, Lng: -104.99, TZ: time.UTC, Height: astronomy.Meters(1609)}
+	f := earth.StandardAtmosphere.Factor(high.Height)
+	if f > 0.86 || f < 0.83 {
+		t.Fatalf("factor at 1609 m = %v", f)
+	}
+	rise, ok, err := moon.NextRise(high, time.Date(2027, 6, 21, 0, 0, 0, 0, time.UTC))
+	if err != nil || !ok {
+		t.Fatalf("NextRise: %v %v", ok, err)
+	}
+	pos, err := moon.Position(high, rise)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := -(0.5667*f + pos.Diameter.Radius() + earth.HorizonDip(high.Height))
+	if math.Abs(pos.Altitude-want) > 0.002 {
+		t.Errorf("altitude at moonrise %.4f, want %.4f (sea-level refraction would give %.4f)",
+			pos.Altitude, want, want-(1-f)*0.5667)
+	}
+
+	for _, when := range []time.Time{rise.Add(20 * time.Minute), rise.Add(time.Hour), rise.Add(3 * time.Hour)} {
+		geo, _ := moon.Position(high, when)
+		app, err := moon.ApparentPosition(high, when)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lift, want := app.Altitude-geo.Altitude, earth.StandardAtmosphere.Refraction(geo.Altitude, high.Height)
+		if math.Abs(lift-want) > 1e-12 || !(lift < earth.Refraction(geo.Altitude)) {
+			t.Errorf("at %s: refraction %.5f, want %.5f (sea level %.5f)", when.Format(time.RFC3339), lift, want, earth.Refraction(geo.Altitude))
 		}
 	}
 }

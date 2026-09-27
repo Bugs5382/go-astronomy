@@ -31,6 +31,7 @@ The codes are part of the public contract: a code is never renumbered, only adde
 | 7014 | `CodeInvalidElements` | Satellite element set (TLE or OMM) that could not be parsed. |
 | 7015 | `CodeSatellitePropagation` | SGP4 could not propagate the element set to the instant (for example, a decayed satellite). |
 | 7016 | `CodeInvalidPassWindow` | Pass window end not after start, or longer than 31 days. |
+| 7017 | `CodeInvalidAtmosphere` | Measured atmosphere with a pressure that is not positive and finite, or a temperature that is not finite or at or below −273 °C. |
 
 These constants are declared on the root `astronomy` package.
 
@@ -39,7 +40,7 @@ These constants are declared on the root `astronomy` package.
 Each error-returning package also exports named sentinels you can match with `errors.Is`, wrapped inside the coded error:
 
 - `astronomy.ErrInvalidHeight`
-- `earth.ErrInvalidLatitude`, `earth.ErrInvalidLongitude`, `earth.ErrInvalidSegmentation`
+- `earth.ErrInvalidLatitude`, `earth.ErrInvalidLongitude`, `earth.ErrInvalidSegmentation`, `earth.ErrInvalidAtmosphere`
 - `star.ErrEmptyMagnitudeRange`
 - `planet.ErrInvalidLatitude`, `planet.ErrInvalidLongitude` (returned by every `planet/<name>` package)
 - `satellite.ErrMalformedTLE`, `satellite.ErrChecksum`, `satellite.ErrMalformedOMM`, `satellite.ErrDecayed` (and the other propagation sentinels), `satellite.ErrInvalidPassWindow`, `satellite.ErrInvalidLatitude`, `satellite.ErrInvalidLongitude`

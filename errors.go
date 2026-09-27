@@ -81,6 +81,10 @@ const (
 	// CodeInvalidPassWindow marks a pass search whose end is not after its
 	// start, or which spans more than 31 days.
 	CodeInvalidPassWindow = 7016
+	// CodeInvalidAtmosphere marks measured air for the refraction model whose
+	// pressure is not a positive finite number or whose temperature is not
+	// finite or at or below -273 C.
+	CodeInvalidAtmosphere = 7017
 )
 
 // errorEntries is the module's code table. It feeds the go-apperr registry that
@@ -100,6 +104,7 @@ var errorEntries = []apperr.Entry{
 	{Code: CodeInvalidElements, Title: "satellite", Cause: "satellite element set could not be parsed"},
 	{Code: CodeSatellitePropagation, Title: "satellite", Cause: "SGP4 could not propagate the element set to the instant"},
 	{Code: CodeInvalidPassWindow, Title: "satellite", Cause: "pass window end not after start, or longer than 31 days"},
+	{Code: CodeInvalidAtmosphere, Title: "atmosphere", Cause: "measured atmosphere pressure or temperature not physical"},
 }
 
 // logSink adapts a go-log Logger to the go-apperr Logger interface. It is the

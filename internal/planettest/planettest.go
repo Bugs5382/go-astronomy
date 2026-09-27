@@ -40,6 +40,7 @@ import (
 	"time"
 
 	astronomy "github.com/Bugs5382/go-astronomy"
+	"github.com/Bugs5382/go-astronomy/earth"
 	"github.com/Bugs5382/go-astronomy/planet"
 )
 
@@ -334,8 +335,9 @@ func CheckIsolated(t *testing.T, name string) {
 
 // CheckHeight checks the observer's height: an omitted height gives exactly
 // the answers of an explicit zero, NaN and infinity are rejected with
-// astronomy.ErrInvalidHeight, and a height lowers the horizon by the dip, so
-// the planet rises earlier and sets later, by the dip's worth of motion.
+// astronomy.ErrInvalidHeight, and a height lowers the horizon by the dip and
+// thins the refraction by the standard atmosphere, so the planet rises earlier
+// and sets later, by the dip's worth of motion less the refraction lost.
 func CheckHeight(t *testing.T, b planet.Body) {
 	t.Helper()
 	when := time.Date(2027, 5, 1, 0, 0, 0, 0, time.UTC)
@@ -363,11 +365,20 @@ func CheckHeight(t *testing.T, b planet.Body) {
 	r1, _, _ := b.NextRise(high, r0.Add(-time.Hour))
 	s0, _, _ := b.NextSet(omitted, when)
 	s1, _, _ := b.NextSet(high, s0.Add(-time.Hour))
-	// The dip at 1524 m is 1.145 degrees; at Denver's latitude a planet climbs
+	// The dip at 1524 m is 1.145 degrees, less 0.08 of refraction the thinner
+	// air does not give; at Denver's latitude a planet climbs
 	// through the horizon at 7 to 13 degrees an hour, so 5 to 10 minutes.
 	for name, d := range map[string]time.Duration{"rise earlier": r0.Sub(r1), "set later": s1.Sub(s0)} {
 		if d < 4*time.Minute || d > 12*time.Minute {
 			t.Errorf("5000 ft moved the %s by %v, want 4 to 12 minutes", name, d)
+		}
+	}
+	// At the rise from height the centre sits on the scaled horizon: the
+	// standard refraction thinned by the air at 1524 m, lowered by the dip.
+	if r, err := b.Position(high, r1); err == nil {
+		want := planet.HorizonAltitude*earth.StandardAtmosphere.Factor(high.Height) - earth.HorizonDip(high.Height)
+		if math.Abs(r.Altitude-want) > 0.01 {
+			t.Errorf("altitude at the rise from 5000 ft %.4f, want %.4f", r.Altitude, want)
 		}
 	}
 	p0, _ := b.Position(omitted, when)

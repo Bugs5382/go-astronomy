@@ -71,7 +71,7 @@ func Example_heightByHand() {
 	// Output:
 	// 5000 ft is 1524 m and equal to Meters(1524): true
 	// dip 1.145 degrees
-	// sunrise 7.2 minutes earlier
+	// sunrise 6.7 minutes earlier
 }
 
 // Lookup: a chain tries a height the caller already has, then a fixed value,
@@ -119,8 +119,9 @@ func Example_flightNYCToLondon() {
 
 		sun := earth.SunPosition(obs, when)
 		// The Sun is up when its centre clears the refracted horizon, which
-		// the dip lowers for an observer at height.
-		horizon := earth.HorizonAltitude - earth.HorizonDip(obs.Height)
+		// the dip lowers for an observer at height and the thinner air there
+		// raises a little, since it refracts the Sun less.
+		horizon := earth.HorizonAltitudeAt(obs.Height)
 		ground := sun.Altitude > earth.HorizonAltitude
 		fmt.Printf("%s %6.2f %7.2f %6.0f ft sun %6.2f up in the air %-5v on the ground %v\n",
 			when.Format("15:04"), lat, lng, obs.Height.Feet(), sun.Altitude, sun.Altitude > horizon, ground)
