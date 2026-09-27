@@ -6,16 +6,18 @@
 // under earth. Every quantity here is Earth-specific: the lunar coordinates come
 // from the meeus Earth-based lunar theory, the horizontal transform needs the
 // observer's latitude, longitude, and Earth sidereal time, the apparent diameter
-// follows from the Earth-Moon distance, and the refraction model is Earth's.
+// follows from the observer's distance to the Moon, and the refraction model is
+// Earth's.
 //
 // Positions are the center of the disc, in degrees, paired with the apparent
 // angular diameter so a consumer can size and place the disc and reason about
 // alignment and overlap with other bodies. Altitudes from Position are geometric
-// (no refraction) and topocentric (corrected for the observer's displacement
-// from the Earth's center by lunar parallax); ApparentPosition adds atmospheric
-// refraction. The package is stateless and concurrency-safe: time is always a
-// parameter, never captured. Accuracy is amateur, arcminute-class; nutation,
-// delta-T, and Earth flattening are below that floor and are not modeled.
+// (no refraction) and topocentric (moved from the Earth's center to the observer
+// on the flattened WGS84 Earth by the rigorous parallax correction), and the
+// diameter is measured from that same observer; ApparentPosition adds
+// atmospheric refraction. The package is stateless and concurrency-safe: time is
+// always a parameter, never captured. Accuracy is amateur, arcminute-class;
+// nutation and delta-T are below that floor and are not modeled.
 package moon
 
 /*
@@ -55,10 +57,9 @@ import (
 	"github.com/Bugs5382/go-astronomy/internal/julian"
 )
 
-// moonRadiusRatio is the ratio of the Moon's radius to the Earth's equatorial
-// radius (Meeus, Astronomical Algorithms, chapter 55). The Moon's apparent
-// angular semidiameter is this fraction of its equatorial horizontal parallax.
-const moonRadiusRatio = 0.272481
+// moonMeanRadiusKm is the IAU mean radius of the Moon, in km (Archinal et al.
+// 2018). JPL Horizons sizes the lunar disc from the same radius.
+const moonMeanRadiusKm = 1737.4
 
 // refractionFloor is the geometric altitude, in degrees, below which
 // ApparentPosition stops applying atmospheric refraction. Below the horizon the
@@ -98,13 +99,13 @@ func validateObserver(obs astronomy.Observer) error {
 }
 
 // topocentric returns the Moon's topocentric horizontal coordinates (geometric,
-// without refraction) and its apparent angular semidiameter in degrees at t. The
-// geocentric ecliptic position from the meeus lunar theory is rotated into the
-// equatorial frame with the mean obliquity, transformed to the observer's
-// horizontal frame, then lowered by the parallax in altitude to account for the
-// observer's displacement from the Earth's center. The parallax in altitude is
-// approximated as the equatorial horizontal parallax times the cosine of the
-// altitude, adequate at the library's arcminute-class accuracy.
+// without refraction) and its apparent angular semidiameter in degrees at t, as
+// seen by the observer. The geocentric ecliptic position from the meeus lunar
+// theory is rotated into the equatorial frame with the mean obliquity, then
+// moved from the Earth's centre to the observer on the WGS84 ellipsoid with the
+// rigorous parallax correction (Meeus chapter 40). The semidiameter comes from
+// the same observer-to-Moon distance, so the disc size and the altitude
+// describe one Moon from one vantage point (issue 44).
 func topocentric(obs astronomy.Observer, t time.Time) (coordinates.Horizontal, float64) {
 	jde := julian.Date(t)
 	lam, bet, dist := ephemeris.MoonPosition(jde)
@@ -112,12 +113,12 @@ func topocentric(obs astronomy.Observer, t time.Time) (coordinates.Horizontal, f
 	eq := coordinates.EclipticToEquatorial(
 		coordinates.Ecliptic{Lon: lam, Lat: bet}, obl)
 	gst := julian.GreenwichSiderealTime(t)
-	hz := coordinates.EquatorialToHorizontal(eq, obs.Lat, obs.Lng, gst)
 
-	parDeg := ephemeris.MoonParallax(dist)
-	hz.Altitude -= parDeg * math.Cos(angles.DegToRad(hz.Altitude))
+	ra, dec, topoDist := ephemeris.Topocentric(eq.RA, eq.Dec, dist, obs.Lat, 0, gst+obs.Lng)
+	hz := coordinates.EquatorialToHorizontal(
+		coordinates.Equatorial{RA: ra, Dec: dec}, obs.Lat, obs.Lng, gst)
 
-	semiDeg := moonRadiusRatio * parDeg
+	semiDeg := angles.RadToDeg(math.Asin(moonMeanRadiusKm / topoDist))
 	return hz, semiDeg
 }
 
@@ -135,7 +136,9 @@ func position(obs astronomy.Observer, t time.Time) astronomy.Position {
 
 // Position returns the Moon's topocentric horizontal position as seen from the
 // observer at instant t: the direction to the center of the disc paired with the
-// disc's apparent angular diameter. The altitude is geometric and does not
+// disc's apparent angular diameter. Both are topocentric: the diameter is sized
+// from the observer's distance to the Moon, which is up to one Earth radius
+// shorter than the geocentric distance when the Moon is high. The altitude is geometric and does not
 // include atmospheric refraction; use ApparentPosition for the refracted
 // altitude. It returns a go-apperr coded error when the observer's latitude or
 // longitude is out of range.
