@@ -23,42 +23,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+// Look angles: a satellite as an observer sees it at one instant.
+
 import (
 	"errors"
 	"math"
 	"time"
 
-	apperr "github.com/Bugs5382/go-apperr"
 	astronomy "github.com/Bugs5382/go-astronomy"
 	"github.com/Bugs5382/go-astronomy/earth"
 	"github.com/Bugs5382/go-astronomy/internal/ephemeris"
 	"github.com/Bugs5382/go-astronomy/internal/julian"
-)
-
-// Sentinel causes for an out-of-range observer, each inside a go-apperr coded
-// error carrying astronomy.CodeInvalidLatitude or CodeInvalidLongitude.
-var (
-	ErrInvalidLatitude  = errors.New("satellite: observer latitude out of range")
-	ErrInvalidLongitude = errors.New("satellite: observer longitude out of range")
-)
-
-func validateObserver(obs astronomy.Observer) error {
-	if obs.Lat < -90 || obs.Lat > 90 {
-		return apperr.Coded(astronomy.CodeInvalidLatitude, ErrInvalidLatitude)
-	}
-	if obs.Lng < -180 || obs.Lng > 180 {
-		return apperr.Coded(astronomy.CodeInvalidLongitude, ErrInvalidLongitude)
-	}
-	return nil
-}
-
-const (
-	// earthRotationRadS is the Earth's rotation rate used with SGP4's TEME
-	// frame (Vallado 2004).
-	earthRotationRadS = 7.292115e-5
-	// wgs84A and wgs84F give the observer's place on the WGS84 ellipsoid.
-	wgs84A = ephemeris.EarthEquatorialRadiusKm
-	wgs84F = ephemeris.EarthFlattening
 )
 
 // Look is a satellite as an observer sees it at one instant.
@@ -85,29 +60,6 @@ type Look struct {
 	// and height above the WGS84 ellipsoid.
 	Latitude, Longitude, AltitudeKm float64
 }
-
-// Magnitude returns the satellite's apparent visual magnitude for a standard
-// magnitude stdMag, the magnitude at 1000 km with half the disc lit (a 90
-// degree phase angle), as published by McCants and Heavens-Above (about -1.8
-// for the ISS; see ISSStandardMagnitude). The satellite is modelled as a
-// diffusely reflecting sphere. It returns +Inf when the satellite is not
-// sunlit.
-func (l Look) Magnitude(stdMag float64) float64 {
-	if !l.Sunlit {
-		return math.Inf(1)
-	}
-	b := l.PhaseAngle * math.Pi / 180
-	f := math.Sin(b) + (math.Pi-b)*math.Cos(b)
-	if f <= 0 {
-		return math.Inf(1)
-	}
-	return stdMag + 5*math.Log10(l.RangeKm/1000) - 2.5*math.Log10(f)
-}
-
-// ISSStandardMagnitude is the International Space Station's standard
-// magnitude, for Look.Magnitude and Pass magnitudes. A satellite's standard
-// magnitude is not part of its element set; the caller supplies it.
-const ISSStandardMagnitude = -1.8
 
 // Position returns where the satellite is in the observer's sky at t. The
 // element set's age is the caller's to judge (Elements.Age): SGP4 positions
@@ -191,50 +143,4 @@ func sunlit(r, sun [3]float64) bool {
 	toSun := sub(sun, r)
 	earthRadius := math.Asin(math.Min(1, wgs84A/norm(r)))
 	return angleBetween(toEarth, toSun) > earthRadius
-}
-
-// siteECEF returns the observer's Earth-fixed position on the WGS84
-// ellipsoid, in km.
-func siteECEF(obs astronomy.Observer) [3]float64 {
-	lat, lng := obs.Lat*math.Pi/180, obs.Lng*math.Pi/180
-	e2 := wgs84F * (2 - wgs84F)
-	sl := math.Sin(lat)
-	n := wgs84A / math.Sqrt(1-e2*sl*sl)
-	return [3]float64{
-		n * math.Cos(lat) * math.Cos(lng),
-		n * math.Cos(lat) * math.Sin(lng),
-		n * (1 - e2) * sl,
-	}
-}
-
-// geodetic returns the WGS84 geodetic latitude and longitude, in degrees,
-// and height, in km, of an Earth-fixed position, by the usual fixed-point
-// iteration on the latitude.
-func geodetic(p [3]float64) (lat, lng, h float64) {
-	e2 := wgs84F * (2 - wgs84F)
-	lng = math.Atan2(p[1], p[0])
-	rxy := math.Hypot(p[0], p[1])
-	lat = math.Atan2(p[2], rxy*(1-e2))
-	var n float64
-	for range 6 {
-		sl := math.Sin(lat)
-		n = wgs84A / math.Sqrt(1-e2*sl*sl)
-		lat = math.Atan2(p[2]+n*e2*sl, rxy)
-	}
-	h = rxy/math.Cos(lat) - n
-	return lat * 180 / math.Pi, lng * 180 / math.Pi, h
-}
-
-func fromRADec(raDeg, decDeg, dist float64) [3]float64 {
-	ra, dec := raDeg*math.Pi/180, decDeg*math.Pi/180
-	return [3]float64{dist * math.Cos(dec) * math.Cos(ra), dist * math.Cos(dec) * math.Sin(ra), dist * math.Sin(dec)}
-}
-
-func sub(a, b [3]float64) [3]float64 { return [3]float64{a[0] - b[0], a[1] - b[1], a[2] - b[2]} }
-func dot(a, b [3]float64) float64    { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2] }
-func norm(a [3]float64) float64      { return math.Sqrt(dot(a, a)) }
-
-func angleBetween(a, b [3]float64) float64 {
-	c := dot(a, b) / (norm(a) * norm(b))
-	return math.Acos(math.Max(-1, math.Min(1, c)))
 }
