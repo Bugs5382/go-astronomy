@@ -1,0 +1,18 @@
+# Topocentric Moon angular diameter and distance from JPL Horizons.
+#
+# Source: JPL Horizons API (https://ssd.jpl.nasa.gov/api/horizons.api), ephemeris DE441,
+# fetched 2026-09-26. One query per row:
+#   COMMAND='301' EPHEM_TYPE='OBSERVER' CENTER='coord@399' COORD_TYPE='GEODETIC'
+#   SITE_COORD='<lng>,<lat>,0' TLIST='<instant>' TIME_TYPE='UT'
+#   QUANTITIES='4,13,20' ANG_FORMAT='DEG' EXTRA_PREC='YES' CSV_FORMAT='YES'
+# Quantity 13 (Ang-diam) is the topocentric apparent diameter in arcseconds, from the
+# IAU mean lunar radius of 1737.4 km. Quantity 20 (delta) is the topocentric distance
+# in AU. Quantity 4 is the airless apparent elevation in degrees.
+#
+# Columns: lat lng instant_utc elevation_deg ang_diam_arcsec delta_au
+32.78  -96.80  2024-04-08T18:44:25Z  64.563974151  2024.290  0.00236678408627
+42.34   -3.70  2026-08-12T18:30:15Z   8.013833891  1957.553  0.00244747147659
+25.69   32.64  2027-08-02T10:07:45Z  81.594660637  2041.534  0.00234679206061
+-33.87 151.21  2028-07-22T04:04:05Z  28.607774884  1985.553  0.00241295791681
+51.48    0.00  2026-01-03T00:00:00Z  65.621423963  2015.755  0.00237680511985
+0.00     0.00  2026-06-15T12:00:00Z  61.003440408  2036.857  0.00235218146451

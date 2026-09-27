@@ -43,7 +43,9 @@ func brooklyn() astronomy.Observer {
 // example 47.a: 1992 April 12, 0h UT), for which the geocentric Moon sits at a
 // distance of 368409.7 km. The expected altitude, azimuth, and diameter were
 // derived from the library's own coordinate chain and pinned here as a
-// regression anchor.
+// regression anchor. The diameter is topocentric: with the Moon at 61.7 degrees
+// the observer is about 5600 km nearer than the Earth's centre, so the disc is
+// 0.5488 degrees rather than the geocentric 0.5406 (issue 44).
 func TestPositionMeeusExample(t *testing.T) {
 	t.Parallel()
 	when := time.Date(1992, 4, 12, 0, 0, 0, 0, time.UTC)
@@ -57,7 +59,7 @@ func TestPositionMeeusExample(t *testing.T) {
 	if got, want := pos.Azimuth, 162.78; abs(got-want) > 0.1 {
 		t.Errorf("azimuth = %.4f, want ~%.2f", got, want)
 	}
-	if got, want := float64(pos.Diameter), 0.5406; abs(got-want) > 0.002 {
+	if got, want := float64(pos.Diameter), 0.5488; abs(got-want) > 0.0005 {
 		t.Errorf("diameter = %.4f, want ~%.4f", got, want)
 	}
 }
