@@ -9,18 +9,18 @@ on:
     branches: [main]
     paths: ['.github/labels.yml']
 permissions:
-  # `actions/checkout` needs to read the repo to find `.github/labels.yml`;
-  # naming any permission here drops the rest to `none`, so `contents` has to
-  # be granted explicitly.
   contents: read
   issues: write
 jobs:
   labeler:
-    name: Sync labels
+    name: 🏷️ Sync labels
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: crazy-max/ghaction-github-labeler@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Reconcile labels with labels.yml
+        uses: crazy-max/ghaction-github-labeler@v5
         with:
           yaml-file: .github/labels.yml
           skip-delete: false

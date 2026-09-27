@@ -14,6 +14,7 @@ jobs:
       contents: write
       pull-requests: read
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       # release-drafter derives the next version from the last PUBLISHED release
       # and starts at 0.1.0 when there is none. This module is releasing at

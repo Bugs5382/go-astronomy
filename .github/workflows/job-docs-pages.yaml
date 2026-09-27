@@ -1,9 +1,9 @@
 name: Docs Site
 # Build the Docusaurus documentation site in website/ and deploy it to GitHub
-# Pages. The build job runs on every PR and push so a broken site fails at PR
-# time; the deploy job runs only on push to main and is guarded so it does not
-# hard-fail CI while the repo is private and Pages is not yet enabled. Once the
-# repo is public and Pages is turned on (Settings -> Pages -> Source = GitHub
+# Pages. The build job runs on PRs (not drafts) so a broken site fails at PR
+# time, and on push to main to feed the deploy; the deploy job runs only on push
+# to main and is guarded so it does not hard-fail CI while Pages is not yet
+# enabled. Once Pages is turned on (Settings -> Pages -> Source = GitHub
 # Actions), the deploy step publishes automatically.
 on:
   push:
@@ -13,6 +13,7 @@ on:
       - '.github/workflows/job-docs-pages.yaml'
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'website/**'
       - '.github/workflows/job-docs-pages.yaml'
@@ -26,7 +27,9 @@ permissions:
 jobs:
   build:
     name: 🏗️ Build site
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: website
@@ -52,6 +55,7 @@ jobs:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Guard: while the repo is private and Pages is off, the deploy fails at the
     # deploy step. continue-on-error keeps that from turning the run red until
     # Pages is enabled on a public repo.
