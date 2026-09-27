@@ -27,6 +27,7 @@ import (
 	"time"
 
 	astronomy "github.com/Bugs5382/go-astronomy"
+	"github.com/Bugs5382/go-astronomy/internal/angles"
 	"github.com/Bugs5382/go-astronomy/internal/coordinates"
 	"github.com/Bugs5382/go-astronomy/internal/ephemeris"
 	"github.com/Bugs5382/go-astronomy/internal/julian"
@@ -48,22 +49,44 @@ import (
 // diameter follows from the Earth-Sun distance. Only the size-versus-distance
 // relation, sun.ApparentDiameter, is universal Sun physics.
 func SunPosition(obs astronomy.Observer, t time.Time) astronomy.Position {
+	return sunHorizontal(obs, t, sunPlaceAt(t))
+}
+
+// sunPlace is the Sun's apparent geocentric place at one instant: right
+// ascension and declination of date in degrees, distance in km, and the
+// nutation in right ascension (the equation of the equinoxes) in degrees,
+// which turns mean sidereal time into apparent. It is everything about the
+// Sun that does not depend on the observer.
+type sunPlace struct {
+	ra, dec, distKm, eqEquinoxes float64
+}
+
+// sunPlaceAt computes the Sun's place at t from VSOP87 and the nutation.
+func sunPlaceAt(t time.Time) sunPlace {
 	// The solar theory (VSOP87) runs on Terrestrial Time; the Earth's rotation
 	// runs on UT, taken as UTC (issue 45).
 	jde := julian.TT(t)
-	ra, dec, distKm := ephemeris.SunApparent(jde)
-	gst := julian.ApparentSiderealTime(t)
+	// One nutation for the apparent longitude, the true obliquity, and the
+	// apparent sidereal time.
+	nut := ephemeris.NutationAt(jde)
+	ra, dec, distKm := ephemeris.SunApparentNutated(jde, nut)
+	return sunPlace{ra: ra, dec: dec, distKm: distKm, eqEquinoxes: nut.InRA()}
+}
+
+// sunHorizontal turns the Sun's place into the observer's horizon at t.
+func sunHorizontal(obs astronomy.Observer, t time.Time, p sunPlace) astronomy.Position {
+	gst := angles.Normalize(julian.GreenwichSiderealTime(t) + p.eqEquinoxes)
 
 	// Move the geocentric place to the observer: the solar parallax is up to
 	// 8.8 arc seconds. The disc stays sized from the Earth-Sun distance: the
 	// observer's offset changes it by under 5e-5 of itself.
-	ra, dec, _ = ephemeris.Topocentric(ra, dec, distKm, obs.Lat, heightMeters(obs), gst+obs.Lng)
+	ra, dec, _ := ephemeris.Topocentric(p.ra, p.dec, p.distKm, obs.Lat, heightMeters(obs), gst+obs.Lng)
 	hz := coordinates.EquatorialToHorizontal(
 		coordinates.Equatorial{RA: ra, Dec: dec},
 		obs.Lat, obs.Lng, gst,
 	)
 
-	distanceAU := distKm / ephemeris.KmPerAU
+	distanceAU := p.distKm / ephemeris.KmPerAU
 
 	return astronomy.Position{
 		Horizontal: astronomy.Horizontal{
@@ -93,6 +116,11 @@ type SunSample struct {
 // at its end. The span honors daylight-saving transitions, spanning 23 or 25
 // hours on such days. Fewer than two samples cannot define a progress span, so
 // SunTrack returns nil in that case.
+//
+// With more samples than the day has hours, the Sun's place is interpolated
+// from its places at whole hours, which moves a sample by under 1e-9 degrees
+// from SunPosition at the same instant and makes a fine track several times
+// cheaper.
 func SunTrack(obs astronomy.Observer, date time.Time, samples int) []SunSample {
 	if samples < 2 {
 		return nil
@@ -102,6 +130,14 @@ func SunTrack(obs astronomy.Observer, date time.Time, samples int) []SunSample {
 	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
 	end := start.AddDate(0, 0, 1)
 	span := end.Sub(start)
+
+	position := SunPosition
+	if samples > trackInterpolateAbove {
+		places := newSunPlaces()
+		position = func(obs astronomy.Observer, t time.Time) astronomy.Position {
+			return sunHorizontal(obs, t, places.at(t))
+		}
+	}
 
 	out := make([]SunSample, samples)
 	last := samples - 1
@@ -113,7 +149,7 @@ func SunTrack(obs astronomy.Observer, date time.Time, samples int) []SunSample {
 		} else {
 			when = start.Add(time.Duration(progress * float64(span)))
 		}
-		pos := SunPosition(obs, when)
+		pos := position(obs, when)
 		out[i] = SunSample{
 			Time:         when,
 			Altitude:     pos.Altitude,
@@ -123,6 +159,11 @@ func SunTrack(obs astronomy.Observer, date time.Time, samples int) []SunSample {
 	}
 	return out
 }
+
+// trackInterpolateAbove is the sample count above which SunTrack interpolates
+// the Sun's place: a day spans about 28 hourly places with the margins the
+// interpolation needs, so below that direct positions are cheaper.
+const trackInterpolateAbove = 32
 
 // heightMeters is the observer's height for the parallax, in metres, with a
 // NaN or infinite height (which the error-returning functions reject) taken

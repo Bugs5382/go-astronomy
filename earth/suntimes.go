@@ -111,7 +111,7 @@ func NewSunTimesWith(obs astronomy.Observer, date time.Time, seg Segmentation) (
 	if err := validateSegmentation(seg); err != nil {
 		return nil, err
 	}
-	return build(obs, date, seg), nil
+	return build(obs, date, seg, sunAltitudes(obs)), nil
 }
 
 // validateSegmentation checks that the segmentation is usable: at least one
@@ -162,14 +162,12 @@ func (s *SunTimes) DayEnd() time.Time { return s.end }
 func (s *SunTimes) DayLength() time.Duration { return s.end.Sub(s.start) }
 
 // build resolves the whole civil day: the band boundaries, solar noon, and the
-// polar state.
-func build(obs astronomy.Observer, date time.Time, seg Segmentation) *SunTimes {
+// polar state, with altAt the Sun's altitude for the observer.
+func build(obs astronomy.Observer, date time.Time, seg Segmentation, altAt func(time.Time) float64) *SunTimes {
 	loc := obs.Location()
 	local := date.In(loc)
 	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
 	end := start.AddDate(0, 0, 1)
-
-	altAt := func(t time.Time) float64 { return SunPosition(obs, t).Altitude }
 
 	noon := solarNoon(altAt, start, end)
 	minAlt := dayMinAltitude(altAt, start, end)
@@ -445,11 +443,12 @@ func SegmentAtWith(obs astronomy.Observer, t time.Time, seg Segmentation) (Segme
 		return Segment{}, 0, err
 	}
 
-	day := build(obs, t, seg)
+	altAt := sunAltitudes(obs)
+	day := build(obs, t, seg, altAt)
 	idx := day.indexAt(t)
 	if idx < 0 {
 		// t sits exactly on the closing midnight; fold it into the next day.
-		day = build(obs, day.end, seg)
+		day = build(obs, day.end, seg, altAt)
 		idx = day.indexAt(t)
 		if idx < 0 {
 			idx = len(day.segments) - 1
@@ -463,12 +462,12 @@ func SegmentAtWith(obs astronomy.Observer, t time.Time, seg Segmentation) (Segme
 	seg2 := band
 	switch {
 	case idx == 0:
-		prev := build(obs, day.start.AddDate(0, 0, -1), seg)
+		prev := build(obs, day.start.AddDate(0, 0, -1), seg, altAt)
 		if last := prev.segments[len(prev.segments)-1]; last.Label == band.Label {
 			seg2 = Segment{Label: band.Label, From: last.From, To: band.To}
 		}
 	case idx == len(day.segments)-1:
-		next := build(obs, day.end, seg)
+		next := build(obs, day.end, seg, altAt)
 		if first := next.segments[0]; first.Label == band.Label {
 			seg2 = Segment{Label: band.Label, From: band.From, To: first.To}
 		}
