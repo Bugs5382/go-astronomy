@@ -48,21 +48,22 @@ import (
 // diameter follows from the Earth-Sun distance. Only the size-versus-distance
 // relation, sun.ApparentDiameter, is universal Sun physics.
 func SunPosition(obs astronomy.Observer, t time.Time) astronomy.Position {
-	// The solar theory runs on Terrestrial Time; the Earth's rotation runs on
-	// UT, taken as UTC (issue 45).
+	// The solar theory (VSOP87) runs on Terrestrial Time; the Earth's rotation
+	// runs on UT, taken as UTC (issue 45).
 	jde := julian.TT(t)
 	ra, dec, distKm := ephemeris.SunApparent(jde)
 	gst := julian.ApparentSiderealTime(t)
 
 	// Move the geocentric place to the observer: the solar parallax is up to
-	// 8.8 arc seconds.
+	// 8.8 arc seconds. The disc stays sized from the Earth-Sun distance: the
+	// observer's offset changes it by under 5e-5 of itself.
 	ra, dec, _ = ephemeris.Topocentric(ra, dec, distKm, obs.Lat, 0, gst+obs.Lng)
 	hz := coordinates.EquatorialToHorizontal(
 		coordinates.Equatorial{RA: ra, Dec: dec},
 		obs.Lat, obs.Lng, gst,
 	)
 
-	distanceAU := ephemeris.SolarRadius(ephemeris.J2000Century(jde))
+	distanceAU := distKm / ephemeris.KmPerAU
 
 	return astronomy.Position{
 		Horizontal: astronomy.Horizontal{

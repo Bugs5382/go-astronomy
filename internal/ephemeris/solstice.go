@@ -30,10 +30,11 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 // table 27.C with the correction of p. 178 for the true instant. The Go form
 // derives from soniakeys/meeus (solstice), MIT licensed.
 //
-// Results are valid for the years -1000 to +3000 and, in the years 1951 to
-// 2050, are within one minute of time. The higher-accuracy method iterates the
-// full VSOP87 solar longitude to the exact quadrant crossing, which this
-// library does not carry.
+// The series gives the instant to within one minute for the years 1951 to
+// 2050. It is then refined by the higher-accuracy method of p. 180: the Sun's
+// apparent longitude from VSOP87 is evaluated at the estimate, and the
+// estimate is moved by 58 sin(k 90 - lambda) days until the correction
+// vanishes, which lands on the exact quadrant crossing (issue 45).
 
 import "math"
 
@@ -86,25 +87,25 @@ var seasonTerms = [...]struct{ amplitude, phase, frequency float64 }{
 // MarchEquinox returns the Julian ephemeris day of the March equinox of the
 // given year, the instant the Sun's apparent longitude reaches 0 degrees.
 func MarchEquinox(year int) float64 {
-	return seasonBoundary(year, marchAncient, marchModern)
+	return refineSeason(seasonBoundary(year, marchAncient, marchModern), 0)
 }
 
 // JuneSolstice returns the Julian ephemeris day of the June solstice of the
 // given year, the instant the Sun's apparent longitude reaches 90 degrees.
 func JuneSolstice(year int) float64 {
-	return seasonBoundary(year, juneAncient, juneModern)
+	return refineSeason(seasonBoundary(year, juneAncient, juneModern), 90)
 }
 
 // SeptemberEquinox returns the Julian ephemeris day of the September equinox of
 // the given year, the instant the Sun's apparent longitude reaches 180 degrees.
 func SeptemberEquinox(year int) float64 {
-	return seasonBoundary(year, septemberAncient, septemberModern)
+	return refineSeason(seasonBoundary(year, septemberAncient, septemberModern), 180)
 }
 
 // DecemberSolstice returns the Julian ephemeris day of the December solstice of
 // the given year, the instant the Sun's apparent longitude reaches 270 degrees.
 func DecemberSolstice(year int) float64 {
-	return seasonBoundary(year, decemberAncient, decemberModern)
+	return refineSeason(seasonBoundary(year, decemberAncient, decemberModern), 270)
 }
 
 // seasonBoundary evaluates one equinox or solstice, choosing between the
@@ -134,4 +135,21 @@ func seasonCorrect(y float64, mean []float64) float64 {
 		s += term.amplitude * math.Cos(radians(term.phase+term.frequency*t))
 	}
 	return j0 + .00001*s/dLambda
+}
+
+// refineSeason moves an estimate of the instant the Sun's apparent longitude
+// reaches target degrees onto the crossing itself (Meeus, p. 180). Each step
+// is 58 sin(target - lambda) days, where 58 days is roughly the Sun's motion
+// of one radian divided into the year; from an estimate within a minute the
+// iteration settles in two or three steps.
+func refineSeason(jde, target float64) float64 {
+	for range 10 {
+		lon, _, _ := SunApparentEcliptic(jde)
+		step := 58 * math.Sin(radians(target-lon))
+		jde += step
+		if math.Abs(step) < 1e-7 {
+			break
+		}
+	}
+	return jde
 }

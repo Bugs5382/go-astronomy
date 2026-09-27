@@ -111,7 +111,7 @@ func main() {
    without notice. Consume only the packages in the map above.
 8. **Accuracy is arcminute-class.** The Sun and Moon run on Terrestrial Time
    (ΔT from the IERS leap-second table) with nutation, and match JPL Horizons
-   to within about 10″ (Moon) and 35″ (Sun). Star positions still omit nutation
+   to within about 10″ (Moon) and 2″ (Sun, from VSOP87). Star positions still omit nutation
    and aberration. Do not rely on the library for higher-precision ephemeris
    work.
 

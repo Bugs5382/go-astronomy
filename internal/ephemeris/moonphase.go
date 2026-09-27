@@ -38,10 +38,10 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import "math"
 
-// kmPerAU is the astronomical unit in kilometres, IAU 2012 definition. The
+// KmPerAU is the astronomical unit in kilometres, IAU 2012 definition. The
 // solar series returns a distance in astronomical units and the lunar series
 // one in kilometres, and the phase angle needs the two in the same unit.
-const kmPerAU = 149597870.700
+const KmPerAU = 149597870.700
 
 // MoonPhaseAngle returns the Sun-Moon-Earth phase angle, in degrees in
 // [0, 180], at the given Julian ephemeris day, by the accurate method of Meeus
@@ -60,11 +60,17 @@ const kmPerAU = 149597870.700
 // so the angle stops that far short.
 func MoonPhaseAngle(jde float64) float64 {
 	moonLon, moonLat, moonDistKm := MoonPosition(jde)
-	t := J2000Century(jde)
-	sunLon := SolarApparentLongitude(t)
-	sunDistKm := SolarRadius(t) * kmPerAU
-	// (48.2). The elongation lies in [0, 180], so its sine is never negative.
-	cosElong := math.Cos(radians(moonLat)) * math.Cos(radians(moonLon-sunLon))
+	sunLon, sunLat, sunDistAU := SunApparentEcliptic(jde)
+	sunDistKm := sunDistAU * KmPerAU
+	// The Moon's series is on the mean equinox of date and the Sun's apparent
+	// place on the true one; the nutation in longitude puts them together.
+	dpsi, _ := Nutation(jde)
+	moonLon += dpsi
+	// (48.2), with the Sun's latitude (under an arc second) kept rather than
+	// taken as zero. The elongation lies in [0, 180], so its sine is never
+	// negative.
+	cosElong := math.Sin(radians(moonLat))*math.Sin(radians(sunLat)) +
+		math.Cos(radians(moonLat))*math.Cos(radians(sunLat))*math.Cos(radians(moonLon-sunLon))
 	sinElong := math.Sin(math.Acos(cosElong))
 	// (48.3). The numerator is positive, so the two-argument arctangent
 	// returns an angle in (0, 180) and the result needs no reduction.
@@ -86,8 +92,9 @@ func MoonPhaseAngle(jde float64) float64 {
 // which is the true angular separation of the two bodies; that also folds.
 func MoonElongation(jde float64) float64 {
 	moonLon, _, _ := MoonPosition(jde)
-	sunLon := SolarApparentLongitude(J2000Century(jde))
-	return pmod(moonLon-sunLon, 360)
+	dpsi, _ := Nutation(jde)
+	sunLon, _, _ := SunApparentEcliptic(jde)
+	return pmod(moonLon+dpsi-sunLon, 360)
 }
 
 // IlluminatedFraction returns the fraction of a body's disk that is lit, in

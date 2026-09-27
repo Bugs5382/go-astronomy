@@ -155,7 +155,7 @@ bash .claude/hooks/install.sh
 - 🤖 **Working in this repo (agents)** — [`AGENTS.md`](./AGENTS.md)
 - 📖 **Guides** — a Docusaurus documentation site is planned; this section will link it once it ships.
 
-Accuracy target is amateur / arcminute-class. The Sun and Moon are computed on Terrestrial Time (ΔT from the IERS leap-second table) with nutation and the observer's parallax, and agree with JPL Horizons DE441 to within about 10″ for the Moon and 35″ for the Sun. Star positions still omit nutation and aberration.
+Accuracy target is amateur / arcminute-class. The Sun and Moon are computed on Terrestrial Time (ΔT from the IERS leap-second table) with nutation and the observer's parallax, and agree with JPL Horizons DE441 to within about 10″ for the Moon and 2″ for the Sun (VSOP87). Star positions still omit nutation and aberration.
 
 ## 🤝 Contributing
 
@@ -169,6 +169,7 @@ Contributions are welcome — bug reports, fixes, new coverage, and docs improve
 ## 🙏 Acknowledgements
 
 - [Jean Meeus](https://en.wikipedia.org/wiki/Jean_Meeus), *Astronomical Algorithms* — the algorithmic foundation. The series in `internal/ephemeris` were ported from [`soniakeys/meeus`](https://github.com/soniakeys/meeus), which this library no longer depends on.
+- P. Bretagnon and G. Francou, [VSOP87](https://ftp.imcce.fr/pub/ephem/planets/vsop87/) (IMCCE) — the planetary theory behind the Sun's position, generated into a truncated table.
 - The [HYG star database](https://codeberg.org/astronexus/hyg) (Hipparcos-Yale-Gliese) — the source for the embedded star catalog, used under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 - The IAU constellation boundaries of Eugène Delporte (1930), digitized by Nancy Roman (1987) as [VizieR VI/42](https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=VI/42) — the source for the embedded boundary table.
 
