@@ -72,9 +72,6 @@ const (
 	CodeXModeNotAzimuth = 7010
 	// CodeInvalidHeight marks an observer Height that is NaN or infinite.
 	CodeInvalidHeight = 7011
-	// CodeInvalidBody marks a planet.Body that is not a planet, or is Earth
-	// where an observable target is needed.
-	CodeInvalidBody = 7013
 )
 
 // errorEntries is the module's code table. It feeds the go-apperr registry that
@@ -91,7 +88,6 @@ var errorEntries = []apperr.Entry{
 	{Code: CodeInvalidElevationScale, Title: "projection", Cause: "geometric elevation degrees-per-pixel not positive"},
 	{Code: CodeXModeNotAzimuth, Title: "projection", Cause: "column-to-azimuth query on a non-azimuth horizontal mode"},
 	{Code: CodeInvalidHeight, Title: "observer", Cause: "observer height is NaN or infinite"},
-	{Code: CodeInvalidBody, Title: "planet", Cause: "body is not an observable planet"},
 }
 
 // logSink adapts a go-log Logger to the go-apperr Logger interface. It is the

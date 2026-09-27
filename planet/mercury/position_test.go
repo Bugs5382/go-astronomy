@@ -1,0 +1,57 @@
+package mercury_test
+
+/*
+MIT License
+
+Copyright (c) 2026 Shane
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+*/
+
+import (
+	"testing"
+
+	"github.com/Bugs5382/go-astronomy/internal/planettest"
+	"github.com/Bugs5382/go-astronomy/planet/mercury"
+)
+
+// TestPositionAgainstHorizons checks Mercury's topocentric apparent place,
+// distance, diameter, phase, and elongation against JPL Horizons DE441 at
+// Greenwich, 2020 to 2030, within 1 arc seconds on the place.
+func TestPositionAgainstHorizons(t *testing.T) {
+	t.Parallel()
+	planettest.CheckPosition(t, mercury.Planet, 1)
+}
+
+// TestNearSun checks the near-Sun flag follows the elongation.
+func TestNearSun(t *testing.T) {
+	t.Parallel()
+	planettest.CheckNearSun(t, mercury.Planet)
+}
+
+// TestFunctionsMatchPlanet checks the package functions and Planet agree.
+func TestFunctionsMatchPlanet(t *testing.T) {
+	t.Parallel()
+	for _, h := range planettest.Horizons(t, mercury.Name)[:3] {
+		a, errA := mercury.Position(planettest.Greenwich, h.When)
+		b, errB := mercury.Planet.Position(planettest.Greenwich, h.When)
+		if errA != nil || errB != nil || a != b {
+			t.Errorf("Position %+v %v, Planet.Position %+v %v", a, errA, b, errB)
+		}
+	}
+}

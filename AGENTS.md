@@ -32,7 +32,9 @@ Module path: `github.com/Bugs5382/go-astronomy`
 | `github.com/Bugs5382/go-astronomy/constellation` | universal (roadmap) | Boundary lookup by RA/Dec; IAU dataset is the overridable default. |
 | `github.com/Bugs5382/go-astronomy/earth` | Earth traits (roadmap) | `earth.SunPosition(obs, t)`, `earth.SunTrack(obs, date, samples)` (disc-center alt/az plus apparent diameter), `earth.NewSunTimes(obs, date)`, twilight bands, `earth.DefaultSegmentation`, `earth.Refraction`, polar states. |
 | `github.com/Bugs5382/go-astronomy/earth/moon` | Earth traits (roadmap) | Luna: `Position`/`ApparentPosition`, `NextRise`/`NextSet`, phases (`Age`, `Illumination`, `PhaseAngle`, next new/full), `Track`. |
-| `github.com/Bugs5382/go-astronomy/planet` | universal | Mercury to Neptune: `Position(obs, body, t)` (topocentric apparent place, diameter, phase, magnitude, elongation, `NearSun`), `NextRise`/`NextSet`/`NextTransit`, and `Heliocentric(body, t)` (observer-independent, Earth included). Carries its own generated VSOP87 tables. |
+| `github.com/Bugs5382/go-astronomy/planet` | universal | Shared planet types only: `Result`, `HeliocentricPosition` (`Vector`), `EarthHeliocentric`, the `Body` interface, `HorizonAltitude`, and the observer errors. No tables. |
+| `github.com/Bugs5382/go-astronomy/planet/<name>` | universal | One package per planet (`mercury`, `venus`, `mars`, `jupiter`, `saturn`, `uranus`, `neptune`), each with only its own VSOP87 table: `Position(obs, t)`, `Heliocentric(t)`, `NextRise`/`NextSet`/`NextTransit`, `Name`, `RadiusKm`, `NearSunElongation`, and `Planet` (a `planet.Body`). |
+| `github.com/Bugs5382/go-astronomy/planet/all` | optional | `Planets()` and `ByName(name)` over every planet; importing it links every table. |
 | `github.com/Bugs5382/go-astronomy/openmeteo` | optional adapter | `astronomy.ElevationResolver` backed by the Open-Meteo elevation API (`New`, `ResolveObserver`, in-process cache, go-log logging). The only package that reaches the network. |
 | `github.com/Bugs5382/go-astronomy/internal/...` | internal | Math core (`angles`, `julian`, `coordinates`, `ephemeris`, `project`). Unexported by policy — do not import. |
 

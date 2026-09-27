@@ -25,13 +25,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+import "github.com/Bugs5382/go-astronomy/internal/vsop87"
+
 // earthVSOP87D is the VSOP87D series for Earth, truncated by amplitude.
 //
 // Source: https://ftp.imcce.fr/pub/ephem/planets/vsop87/VSOP87D.ear
 // SHA-256: 8b160c859136d467f2be7fc29efa8a9652e95516dfbde00e4c739d7ddc90ca91
 // Truncation: |A| * 0.3^alpha >= 3e-08; 324 of 2425 terms kept.
-var earthVSOP87D = VSOP87Body{
-	L: [][]VSOP87Term{
+var earthVSOP87D = vsop87.Body{
+	L: [][]vsop87.Term{
 		// L0
 		{
 			{A: 1.75347045673, B: 0, C: 0},
@@ -232,7 +234,7 @@ var earthVSOP87D = VSOP87Body{
 		// L5
 		{},
 	},
-	B: [][]VSOP87Term{
+	B: [][]vsop87.Term{
 		// B0
 		{
 			{A: 2.7962e-06, B: 3.19870156017, C: 84334.66158130829},
@@ -277,7 +279,7 @@ var earthVSOP87D = VSOP87Body{
 		// B4
 		{},
 	},
-	R: [][]VSOP87Term{
+	R: [][]vsop87.Term{
 		// R0
 		{
 			{A: 1.00013988799, B: 0, C: 0},
