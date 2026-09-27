@@ -14,6 +14,7 @@ const sidebars: SidebarsConfig = {
       label: 'Package reference',
       collapsed: false,
       items: [
+        'reference/observer',
         'reference/sun',
         'reference/earth',
         'reference/moon',

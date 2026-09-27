@@ -35,6 +35,17 @@ type Observer struct {
 	Lng float64
 	// TZ is the observer's local time zone. A nil value is treated as UTC.
 	TZ *time.Location
+	// Height is the observer's height above sea level, optional: the zero
+	// value is SeaLevel, which reproduces the sea-level answers exactly and
+	// needs no lookup. Set it with Meters or Feet, or look it up with an
+	// ElevationResolver (see ResolveObserverWith).
+	//
+	// From height the sea horizon lies below the astronomical horizon by the
+	// dip (see earth.HorizonDip), so the Sun and Moon rise earlier and set
+	// later; the height also enters their parallax. The dip assumes an
+	// unobstructed sea horizon. For an observer in motion, such as a plane,
+	// pass the position and height for each instant to each call.
+	Height Height
 }
 
 // Location returns the observer's time zone, defaulting to UTC when TZ is nil.

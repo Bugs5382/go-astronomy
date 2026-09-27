@@ -65,9 +65,10 @@ type Segment struct {
 func (s Segment) Contains(t time.Time) bool
 
 type Level struct {
-	Altitude float64 // geometric center altitude of the boundary, degrees
-	Rising   string  // label of the band above this level while the Sun climbs
-	Setting  string  // label of the band above this level while the Sun sinks
+	Altitude     float64 // geometric center altitude of the boundary, degrees
+	Rising       string  // label of the band above this level while the Sun climbs
+	Setting      string  // label of the band above this level while the Sun sinks
+	DipCorrected bool    // lower this level by the horizon dip for the observer's height
 }
 
 type Segmentation struct {
@@ -77,6 +78,8 @@ type Segmentation struct {
 }
 
 var DefaultSegmentation Segmentation
+
+func (s Segmentation) WithTwilightDip() Segmentation
 ```
 
 A `Segmentation` divides the Sun's altitude over a civil day into named bands. `DefaultSegmentation` is the Earth default: astronomical (−18°), nautical (−12°), and civil (−6°) twilight, the sunrise/sunset horizon crossing (−0.833°, upper limb including refraction), a short sunrise/sunset band up to −0.3°, golden hour up to +6°, and full day above that. A band takes its `Rising` label while the Sun climbs through it and its `Setting` label while the Sun sinks, so a twilight band that runs past local midnight keeps one label on both dates. The day is split at solar noon, and at solar midnight when the Sun stays above the lowest level all night, so the daytime band has morning (`Rising`) and afternoon (`Setting`) halves. Treat `DefaultSegmentation` as read-only; build a fresh value to customize.
@@ -91,6 +94,31 @@ func Refraction(apparentAltDeg float64) float64
 ```
 
 `Refraction` returns the atmospheric refraction, in degrees, that lifts a body seen at a given apparent altitude above its true geometric altitude, using Bennett's formula for a standard atmosphere (about 0.57° at the horizon, falling to zero near the zenith). `HorizonAltitude` (−0.833°) is the geometric center altitude at which the Sun's upper limb sits on the horizon under that refraction plus the mean solar semidiameter; it is the sunrise/sunset threshold.
+
+## ⛰️ Observer height and the horizon dip
+
+```go
+const DipArcminPerRootMetre = 1.76
+func HorizonDip(h astronomy.Height) float64 // degrees
+```
+
+`astronomy.Observer.Height` is optional; the zero value is sea level and reproduces the sea-level answers exactly. From height the sea horizon sits below the astronomical horizon by the dip, `1.76′ × √h`, so `NewSunTimes` and `SegmentAt` move sunrise earlier and sunset later: 7.3 minutes at Denver (1609 m) in June. `HorizonDip` returns the dip in degrees, and zero at or below sea level.
+
+```go
+fmt.Printf("%.3f\n", earth.HorizonDip(astronomy.Meters(1609)))  // 1.177
+fmt.Printf("%.3f\n", earth.HorizonDip(astronomy.Feet(36000)))   // 3.073
+```
+
+| height | dip |
+| --- | --- |
+| 10 m | 0.09° |
+| 100 m | 0.29° |
+| 1524 m (5000 ft) | 1.15° |
+| 1609 m (Denver) | 1.18° |
+| 3640 m (La Paz) | 1.77° |
+| 10973 m (36000 ft) | 3.07° |
+
+By default only sunrise and sunset move. `DefaultSegmentation` marks the sunrise and sunset crossing (−0.833°) and the top of the sunrise band (−0.3°) as `DipCorrected`, and the segmentation's `Horizon` always takes the dip. The civil, nautical, and astronomical twilight levels do not: by the USNO convention, they are the Sun's depression below the astronomical horizon. `WithTwilightDip` returns a copy with every level dip-corrected; at Denver in March it moves civil dawn 6.1 minutes earlier. A NaN or infinite height is rejected with `astronomy.ErrInvalidHeight`. See [Observer and height](./observer.md) for the three ways to set a height, the resolvers, and a moving-observer example.
 
 ## ❄️ Polar states
 

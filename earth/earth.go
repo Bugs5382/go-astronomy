@@ -44,6 +44,8 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 import (
 	"math"
 	"time"
+
+	astronomy "github.com/Bugs5382/go-astronomy"
 )
 
 // Standard band labels emitted by DefaultSegmentation. A consumer supplying a
@@ -69,6 +71,28 @@ const (
 // the threshold used for sunrise and sunset.
 const HorizonAltitude = -0.833
 
+// DipArcminPerRootMetre is the coefficient of the horizon dip: the sea
+// horizon seen from h metres lies 1.76 * sqrt(h) arc minutes below the
+// astronomical horizon. It is the Nautical Almanac value, which includes
+// standard terrestrial refraction, so it is the dip an observer actually sees
+// and matches the refracted horizon the rise and set threshold already uses.
+// The purely geometric dip, 1.93 * sqrt(h), ignores that refraction.
+const DipArcminPerRootMetre = 1.76
+
+// HorizonDip returns the dip of the sea horizon, in degrees, for an observer
+// at height h. It is zero at or below sea level, where no sea horizon lies
+// below the observer, and for a height that is not a finite number.
+//
+// The dip assumes an unobstructed horizon at sea level; terrain that hides it
+// makes the true horizon higher, not lower.
+func HorizonDip(h astronomy.Height) float64 {
+	m := h.Meters()
+	if h.Err() != nil || !(m > 0) {
+		return 0
+	}
+	return DipArcminPerRootMetre * math.Sqrt(m) / 60
+}
+
 // Level is one altitude boundary in a Segmentation together with the labels of
 // the band lying immediately above it. While the Sun climbs through the band
 // (from solar midnight toward solar noon) the band is named Rising; while it
@@ -84,18 +108,25 @@ type Level struct {
 	Rising string
 	// Setting labels the band above this Level while the Sun sinks.
 	Setting string
+	// DipCorrected lowers this Level by the horizon dip for the observer's
+	// height (see HorizonDip). DefaultSegmentation sets it on the sunrise and
+	// sunset levels only: by the USNO convention, civil, nautical, and
+	// astronomical twilight are the Sun's depression below the astronomical
+	// horizon and do not take the dip. WithTwilightDip sets it on every level.
+	DipCorrected bool
 }
 
 // Segmentation divides the Sun's altitude over a civil day into named bands. It
 // is a set of altitude Levels in ascending order; the band below the lowest
 // Level is labeled Night, and each Level labels the band above it. Horizon is
 // the altitude treated as the sunrise and sunset boundary and drives polar
-// detection.
+// detection; it always takes the horizon dip for the observer's height.
 type Segmentation struct {
 	// Night labels the band below the lowest Level (deep night).
 	Night string
 	// Horizon is the altitude, in degrees, used for sunrise, sunset, and polar
-	// state detection.
+	// state detection, at sea level. It is lowered by the horizon dip for an
+	// observer above sea level.
 	Horizon float64
 	// Levels are the altitude boundaries in ascending order of Altitude.
 	Levels []Level
@@ -107,6 +138,10 @@ type Segmentation struct {
 // sunset band up to -0.3, golden hour up to +6, and full day above that. It is
 // a shared value; treat it as read-only and build a fresh Segmentation to
 // customize.
+//
+// For an observer above sea level, the sunrise and sunset crossing and the top
+// of the sunrise band are lowered by the horizon dip; the twilight levels are
+// not (see Level.DipCorrected and WithTwilightDip).
 var DefaultSegmentation = Segmentation{
 	Night:   LabelNight,
 	Horizon: HorizonAltitude,
@@ -114,10 +149,46 @@ var DefaultSegmentation = Segmentation{
 		{Altitude: -18, Rising: LabelAstronomicalDawn, Setting: LabelAstronomicalDusk},
 		{Altitude: -12, Rising: LabelNauticalDawn, Setting: LabelNauticalDusk},
 		{Altitude: -6, Rising: LabelCivilDawn, Setting: LabelCivilDusk},
-		{Altitude: HorizonAltitude, Rising: LabelSunrise, Setting: LabelSunset},
-		{Altitude: -0.3, Rising: LabelGoldenHour, Setting: LabelGoldenHour},
+		{Altitude: HorizonAltitude, Rising: LabelSunrise, Setting: LabelSunset, DipCorrected: true},
+		{Altitude: -0.3, Rising: LabelGoldenHour, Setting: LabelGoldenHour, DipCorrected: true},
 		{Altitude: 6, Rising: LabelDay, Setting: LabelDay},
 	},
+}
+
+// WithTwilightDip returns a copy of the segmentation with every level lowered
+// by the horizon dip, so the twilight boundaries move with the observer's
+// height along with sunrise and sunset. It departs from the USNO convention,
+// under which twilight is measured from the astronomical horizon; use it when
+// the twilight bands should track the horizon the observer actually sees. The
+// receiver is not modified.
+func (s Segmentation) WithTwilightDip() Segmentation {
+	out := s
+	out.Levels = make([]Level, len(s.Levels))
+	for i, l := range s.Levels {
+		l.DipCorrected = true
+		out.Levels[i] = l
+	}
+	return out
+}
+
+// atHeight returns a copy of the segmentation for an observer at height h:
+// the horizon and every dip-corrected level lowered by the horizon dip. At
+// sea level it returns the segmentation unchanged.
+func (s Segmentation) atHeight(h astronomy.Height) Segmentation {
+	dip := HorizonDip(h)
+	if dip == 0 {
+		return s
+	}
+	out := s
+	out.Horizon -= dip
+	out.Levels = make([]Level, len(s.Levels))
+	for i, l := range s.Levels {
+		if l.DipCorrected {
+			l.Altitude -= dip
+		}
+		out.Levels[i] = l
+	}
+	return out
 }
 
 // Refraction returns the atmospheric refraction, in degrees, that lifts a body

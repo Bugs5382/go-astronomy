@@ -26,13 +26,14 @@ Module path: `github.com/Bugs5382/go-astronomy`
 
 | Import path | Kind | What it provides |
 |---|---|---|
-| `github.com/Bugs5382/go-astronomy` | universal | Package doc and shared types (`Observer`, coordinate types). |
+| `github.com/Bugs5382/go-astronomy` | universal | Package doc and shared types (`Observer`, coordinate types), the optional observer `Height` (`Meters`, `Feet`), and the network-free resolvers (`ElevationResolver`, `StaticElevation`, `CallerElevation`, `ChainElevation`, `ResolveObserverWith`). |
 | `github.com/Bugs5382/go-astronomy/sun` | universal | `sun.ApparentDiameter(distanceAU)`, `sun.ApparentSemidiameter(distanceAU)`, `sun.SemidiameterArcsecAt1AU` — the Sun's apparent size versus distance; observer-independent physics only. |
 | `github.com/Bugs5382/go-astronomy/star` | universal (roadmap) | Embedded HYG catalog (RA/Dec + distance); projects to alt/az for the observer/instant. |
 | `github.com/Bugs5382/go-astronomy/constellation` | universal (roadmap) | Boundary lookup by RA/Dec; IAU dataset is the overridable default. |
 | `github.com/Bugs5382/go-astronomy/earth` | Earth traits (roadmap) | `earth.SunPosition(obs, t)`, `earth.SunTrack(obs, date, samples)` (disc-center alt/az plus apparent diameter), `earth.NewSunTimes(obs, date)`, twilight bands, `earth.DefaultSegmentation`, `earth.Refraction`, polar states. |
 | `github.com/Bugs5382/go-astronomy/earth/moon` | Earth traits (roadmap) | Luna: `Position`/`ApparentPosition`, `NextRise`/`NextSet`, phases (`Age`, `Illumination`, `PhaseAngle`, next new/full), `Track`. |
 | `github.com/Bugs5382/go-astronomy/satellite` | Earth satellites | `ParseTLE`/`ParseOMM` (caller-supplied elements, no network), SGP4/SDP4 `Propagate`, `Position(obs, elements, t)` (alt/az, range, sunlit, magnitude), `Passes` (rise/peak/set, visibility, shadow entry/exit). |
+| `github.com/Bugs5382/go-astronomy/openmeteo` | optional adapter | `astronomy.ElevationResolver` backed by the Open-Meteo elevation API (`New`, `ResolveObserver`, in-process cache, go-log logging). The only package that reaches the network. |
 | `github.com/Bugs5382/go-astronomy/internal/...` | internal | Math core (`angles`, `julian`, `coordinates`, `ephemeris`, `project`). Unexported by policy — do not import. |
 
 Only the Sun is universal to the solar system. Moons are body-specific (Luna
