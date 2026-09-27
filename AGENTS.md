@@ -136,6 +136,7 @@ Commands come from the `Taskfile.yaml`:
 - Format: `task fmt` (`gofmt` + `goimports`)
 - Lint: `task lint` (`gofmt` check, `golangci-lint`, `yamllint`)
 - License headers: `task license` (verify, dry run) / `task license:fix` (inject)
+- Open every PR as a draft. CI skips drafts, so run the full checks locally, push once they pass, and mark the PR ready when the work is finished; see CLAUDE.md "CI and Actions minutes".
 
 No emoji or AI tells in Go source or commit messages; emoji are allowed in
 Markdown docs and workflow files only. The branch/commit/PR rules in `CLAUDE.md`
