@@ -17,7 +17,9 @@
 //
 // Distance is retained in parsecs so a future vantage other than Earth can
 // reproject a star from its true three-dimensional position rather than treating
-// the sky as an infinitely distant sphere. The package is stateless and
+// the sky as an infinitely distant sphere. Each star also carries its proper
+// motion and radial velocity, and PositionAt moves it along its space motion
+// from the J2000 catalog place to any epoch. The package is stateless and
 // concurrency-safe; the catalog is parsed once on first use and never mutated.
 package star
 
@@ -50,13 +52,16 @@ import (
 	"encoding/csv"
 	"errors"
 	"io"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	apperr "github.com/Bugs5382/go-apperr"
 	astronomy "github.com/Bugs5382/go-astronomy"
+	"github.com/Bugs5382/go-astronomy/internal/julian"
 )
 
 // MagnitudeCutoff is the faintest apparent visual magnitude included in the
@@ -106,6 +111,16 @@ type Star struct {
 	// Gliese is the Gliese-Jahreiss nearby-star catalog identifier, or the empty
 	// string when absent.
 	Gliese string
+	// PMRA is the proper motion in right ascension, in milliarcseconds per
+	// year, as the Hipparcos catalog gives it: the motion along the parallel,
+	// so it already carries the cosine of the declination. Zero when unknown.
+	PMRA float64
+	// PMDec is the proper motion in declination, in milliarcseconds per year.
+	// Zero when unknown.
+	PMDec float64
+	// RadialVelocity is the velocity along the line of sight, in km/s,
+	// positive receding. Zero when unknown.
+	RadialVelocity float64
 }
 
 // catalog holds the parsed, immutable catalog and the lookup index built from
@@ -126,7 +141,7 @@ var load = sync.OnceValue(func() *catalog {
 		panic("star: reading embedded catalog: " + err.Error())
 	}
 	r := csv.NewReader(bytes.NewReader(data))
-	r.FieldsPerRecord = 11
+	r.FieldsPerRecord = 14
 	r.ReuseRecord = true
 
 	// Discard the header row.
@@ -144,17 +159,20 @@ var load = sync.OnceValue(func() *catalog {
 			panic("star: parsing catalog: " + err.Error())
 		}
 		all = append(all, Star{
-			ProperName:    rec[0],
-			Designation:   rec[1],
-			Constellation: rec[2],
-			RA:            mustFloat(rec[3]),
-			Dec:           mustFloat(rec[4]),
-			Distance:      mustFloat(rec[5]),
-			Magnitude:     mustFloat(rec[6]),
-			HIP:           rec[7],
-			HD:            rec[8],
-			HR:            rec[9],
-			Gliese:        rec[10],
+			ProperName:     rec[0],
+			Designation:    rec[1],
+			Constellation:  rec[2],
+			RA:             mustFloat(rec[3]),
+			Dec:            mustFloat(rec[4]),
+			Distance:       mustFloat(rec[5]),
+			Magnitude:      mustFloat(rec[6]),
+			HIP:            rec[7],
+			HD:             rec[8],
+			HR:             rec[9],
+			Gliese:         rec[10],
+			PMRA:           optionalFloat(rec[11]),
+			PMDec:          optionalFloat(rec[12]),
+			RadialVelocity: optionalFloat(rec[13]),
 		})
 	}
 	sort.SliceStable(all, func(i, j int) bool {
@@ -190,6 +208,65 @@ func mustFloat(s string) float64 {
 		panic("star: malformed numeric field " + strconv.Quote(s) + ": " + err.Error())
 	}
 	return v
+}
+
+// optionalFloat parses a catalog float field that may be empty, which means
+// zero.
+func optionalFloat(s string) float64 {
+	if s == "" {
+		return 0
+	}
+	return mustFloat(s)
+}
+
+// j2000 is the Julian ephemeris day of J2000.0, the catalog's epoch.
+const j2000 = 2451545.0
+
+// kmPerSecondToParsecsPerYear converts a velocity in km/s to parsecs per
+// Julian year.
+const kmPerSecondToParsecsPerYear = 365.25 * 86400 / 3.0856775814913673e13
+
+// PositionAt returns the star's mean place at instant t, still on the J2000
+// equator and equinox: the catalog place carried along the star's space
+// motion from the J2000.0 epoch. The proper motion moves the place across
+// the sky; with a distance and a radial velocity the motion is along a
+// straight line in space, which also changes the rate of the proper motion
+// as the star comes closer or recedes (Barnard's Star, the fastest, moves
+// 10.4 arc seconds a year and is 0.14 arc second a century ahead of the
+// linear rate). A star with no known motion stays where the catalog puts it.
+//
+// It is the star's own motion, the same for every observer; the apparent
+// place from Earth (precession, nutation, aberration) is the earth
+// package's StarPosition.
+func (s Star) PositionAt(t time.Time) (raDeg, decDeg float64) {
+	if s.PMRA == 0 && s.PMDec == 0 && s.RadialVelocity == 0 {
+		return s.RA, s.Dec
+	}
+	years := (julian.TT(t) - j2000) / 365.25
+	const masToRad = math.Pi / 180 / 3600 / 1000
+	sa, ca := math.Sincos(s.RA * math.Pi / 180)
+	sd, cd := math.Sincos(s.Dec * math.Pi / 180)
+	// The unit vector to the star and the directions of increasing right
+	// ascension and declination on the sky.
+	u := [3]float64{cd * ca, cd * sa, sd}
+	east := [3]float64{-sa, ca, 0}
+	north := [3]float64{-sd * ca, -sd * sa, cd}
+	muA, muD := s.PMRA*masToRad, s.PMDec*masToRad
+	// The radial motion as a fraction of the distance per year.
+	var radial float64
+	if s.Distance > 0 {
+		radial = s.RadialVelocity * kmPerSecondToParsecsPerYear / s.Distance
+	}
+	var p [3]float64
+	for i := range p {
+		p[i] = u[i] + (muA*east[i]+muD*north[i]+radial*u[i])*years
+	}
+	raDeg = math.Atan2(p[1], p[0]) * 180 / math.Pi
+	if raDeg < 0 {
+		raDeg += 360
+	}
+	decDeg = math.Atan2(p[2], math.Hypot(p[0], p[1])) * 180 / math.Pi
+	return raDeg, decDeg
 }
 
 // All returns every star in the catalog, ordered from brightest to faintest.

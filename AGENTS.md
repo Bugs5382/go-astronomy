@@ -28,9 +28,9 @@ Module path: `github.com/Bugs5382/go-astronomy`
 |---|---|---|
 | `github.com/Bugs5382/go-astronomy` | universal | Package doc and shared types (`Observer`, coordinate types), the optional observer `Height` (`Meters`, `Feet`), and the network-free resolvers (`ElevationResolver`, `StaticElevation`, `CallerElevation`, `ChainElevation`, `ResolveObserverWith`). |
 | `github.com/Bugs5382/go-astronomy/sun` | universal | `sun.ApparentDiameter(distanceAU)`, `sun.ApparentSemidiameter(distanceAU)`, `sun.SemidiameterArcsecAt1AU` — the Sun's apparent size versus distance; observer-independent physics only. |
-| `github.com/Bugs5382/go-astronomy/star` | universal (roadmap) | Embedded HYG catalog (RA/Dec + distance); projects to alt/az for the observer/instant. |
+| `github.com/Bugs5382/go-astronomy/star` | universal | Embedded HYG catalog: RA/Dec (J2000), distance, magnitude, proper motion (`PMRA`, `PMDec`), and radial velocity; `Star.PositionAt(t)` carries a star along its space motion. `earth.StarPosition` projects it to alt/az. |
 | `github.com/Bugs5382/go-astronomy/constellation` | universal (roadmap) | Boundary lookup by RA/Dec; IAU dataset is the overridable default. |
-| `github.com/Bugs5382/go-astronomy/earth` | Earth traits (roadmap) | `earth.SunPosition(obs, t)`, `earth.SunTrack(obs, date, samples)` (disc-center alt/az plus apparent diameter), `earth.NewSunTimes(obs, date)`, twilight bands, `earth.DefaultSegmentation`, `earth.Refraction`, the horizon dip and the refraction at height (`earth.HorizonDip`, `earth.StandardAtmosphere`, `earth.MeasuredAtmosphere`, `earth.HorizonAltitudeAt`), polar states. |
+| `github.com/Bugs5382/go-astronomy/earth` | Earth traits (roadmap) | `earth.SunPosition(obs, t)`, `earth.SunTrack(obs, date, samples)` (disc-center alt/az plus apparent diameter), `earth.NewSunTimes(obs, date)`, twilight bands, `earth.DefaultSegmentation`, `earth.Refraction`, the horizon dip and the refraction at height (`earth.HorizonDip`, `earth.StandardAtmosphere`, `earth.MeasuredAtmosphere`, `earth.HorizonAltitudeAt`), polar states, `earth.StarPosition` and `earth.NewStarField` (a whole sky at one instant). |
 | `github.com/Bugs5382/go-astronomy/earth/moon` | Earth traits (roadmap) | Luna: `Position`/`ApparentPosition`, `NextRise`/`NextSet`, `BrightLimbAt`, phases (`Age`, `Illumination`, `PhaseAngle`, next new/full), `Track`. |
 | `github.com/Bugs5382/go-astronomy/planet` | universal | Shared planet types only: `Result`, `HeliocentricPosition` (`Vector`), `EarthHeliocentric`, the `Body` interface, `HorizonAltitude`, and the observer errors. No tables. |
 | `github.com/Bugs5382/go-astronomy/planet/<name>` | universal | One package per planet (`mercury`, `venus`, `mars`, `jupiter`, `saturn`, `uranus`, `neptune`), each with only its own VSOP87 table: `Position(obs, t)`, `Heliocentric(t)`, `NextRise`/`NextSet`/`NextTransit`, `Name`, `RadiusKm`, `NearSunElongation`, and `Planet` (a `planet.Body`). |
@@ -121,9 +121,10 @@ func main() {
    without notice. Consume only the packages in the map above.
 8. **Accuracy is arcminute-class.** The Sun and Moon run on Terrestrial Time
    (ΔT from the IERS leap-second table) with nutation, and match JPL Horizons
-   to within about 10″ (Moon) and 2″ (Sun, from VSOP87). Star positions still omit nutation
-   and aberration. Do not rely on the library for higher-precision ephemeris
-   work.
+   to within about 10″ (Moon) and 2″ (Sun, from VSOP87). Stars move along
+   their proper motion and come out at their apparent place (precession,
+   nutation, annual aberration, parallax), within about 0.1″ of the IAU SOFA
+   library. Do not rely on the library for higher-precision ephemeris work.
 
 ## Build, test, lint (contributors)
 

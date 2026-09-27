@@ -32,6 +32,7 @@ import (
 	astronomy "github.com/Bugs5382/go-astronomy"
 	"github.com/Bugs5382/go-astronomy/earth"
 	"github.com/Bugs5382/go-astronomy/internal/coordinates"
+	"github.com/Bugs5382/go-astronomy/internal/ephemeris"
 	"github.com/Bugs5382/go-astronomy/internal/julian"
 	"github.com/Bugs5382/go-astronomy/star"
 )
@@ -48,13 +49,14 @@ func mustStar(t *testing.T, name string) star.Star {
 // starPinned holds each star's altitude and azimuth in degrees as this library
 // computes them, over a grid of four named stars, four observers, and three
 // instants. The values pin the Earth-vantage star chain so any change to
-// precession, sidereal time, or the horizontal transform is caught to the
-// twelfth decimal.
+// the space motion, precession, nutation, aberration, sidereal time, or the
+// horizontal transform is caught to the twelfth decimal.
 //
-// The chain's accuracy is established elsewhere against the book rather than
-// against itself: precession by Meeus example 21.b and the horizontal transform
-// by example 13.b, both in internal/coordinates, and the sidereal time by
-// examples 12.a and 12.b in internal/julian.
+// The values moved by up to 43 arc seconds when the chain gained proper
+// motion, nutation, annual aberration, and parallax (issue 37); the new
+// chain's accuracy is established against the IAU SOFA library in
+// TestStarPositionAgainstSOFA and against Meeus example 23.a in
+// internal/ephemeris, not against itself.
 var starPinned = []struct {
 	star     string
 	observer string
@@ -62,54 +64,54 @@ var starPinned = []struct {
 	alt      float64
 	az       float64
 }{
-	{"Sirius", "brooklyn", "2026-01-15T03:00:00Z", 30.698114003175, 162.192176778997},
-	{"Sirius", "brooklyn", "2026-07-04T22:30:00Z", -7.091306567564, 253.983161674363},
-	{"Sirius", "brooklyn", "1982-05-03T06:00:00Z", -45.064019617046, 288.966912458304},
-	{"Sirius", "quito", "2026-01-15T03:00:00Z", 63.906351316179, 130.436007736220},
-	{"Sirius", "quito", "2026-07-04T22:30:00Z", 9.248841331046, 253.058101057527},
-	{"Sirius", "quito", "1982-05-03T06:00:00Z", -39.106175554452, 248.110253547595},
-	{"Sirius", "tromso", "2026-01-15T03:00:00Z", -11.244041906107, 252.019487023630},
-	{"Sirius", "tromso", "2026-07-04T22:30:00Z", -37.078796919277, 357.378237449514},
-	{"Sirius", "tromso", "1982-05-03T06:00:00Z", -29.294679955982, 55.577457433082},
-	{"Sirius", "auckland", "2026-01-15T03:00:00Z", -16.909298593303, 127.166193610509},
-	{"Sirius", "auckland", "2026-07-04T22:30:00Z", 59.238388917606, 56.280714870585},
-	{"Sirius", "auckland", "1982-05-03T06:00:00Z", 60.438028770582, 306.407147375089},
-	{"Vega", "brooklyn", "2026-01-15T03:00:00Z", -9.520195444743, 349.125155128596},
-	{"Vega", "brooklyn", "2026-07-04T22:30:00Z", 22.210151138683, 57.201936855248},
-	{"Vega", "brooklyn", "1982-05-03T06:00:00Z", 57.789142972751, 79.354121031945},
-	{"Vega", "quito", "2026-01-15T03:00:00Z", -47.872925172478, 338.561454997771},
-	{"Vega", "quito", "2026-07-04T22:30:00Z", -5.936857031172, 50.967390910371},
-	{"Vega", "quito", "1982-05-03T06:00:00Z", 32.166619395846, 42.123625432105},
-	{"Vega", "tromso", "2026-01-15T03:00:00Z", 32.430090555708, 65.031515063835},
-	{"Vega", "tromso", "2026-07-04T22:30:00Z", 59.158440464058, 179.912048942488},
-	{"Vega", "tromso", "1982-05-03T06:00:00Z", 49.365096409300, 247.864275082007},
-	{"Vega", "auckland", "2026-01-15T03:00:00Z", -0.986136309057, 320.387542822882},
-	{"Vega", "auckland", "2026-07-04T22:30:00Z", -70.802866586192, 283.260095987266},
-	{"Vega", "auckland", "1982-05-03T06:00:00Z", -69.053217682249, 76.640832057748},
-	{"Betelgeuse", "brooklyn", "2026-01-15T03:00:00Z", 56.584918462732, 173.677309538668},
-	{"Betelgeuse", "brooklyn", "2026-07-04T22:30:00Z", -0.694903171831, 280.398149982677},
-	{"Betelgeuse", "brooklyn", "1982-05-03T06:00:00Z", -33.779078768510, 321.202140068030},
-	{"Betelgeuse", "quito", "2026-01-15T03:00:00Z", 78.966217730252, 46.369229742804},
-	{"Betelgeuse", "quito", "2026-07-04T22:30:00Z", -2.824177626869, 277.409818579850},
-	{"Betelgeuse", "quito", "1982-05-03T06:00:00Z", -53.186471964354, 282.173163723684},
-	{"Betelgeuse", "tromso", "2026-01-15T03:00:00Z", 7.155732141047, 272.021479225887},
-	{"Betelgeuse", "tromso", "2026-07-04T22:30:00Z", -12.617890316775, 10.415327953401},
-	{"Betelgeuse", "tromso", "1982-05-03T06:00:00Z", -2.591071468933, 60.463928619268},
-	{"Betelgeuse", "auckland", "2026-01-15T03:00:00Z", -24.216100650903, 99.226997891368},
-	{"Betelgeuse", "auckland", "2026-07-04T22:30:00Z", 43.853450179749, 19.353030040759},
-	{"Betelgeuse", "auckland", "1982-05-03T06:00:00Z", 33.796505205810, 314.061206088896},
-	{"Polaris", "brooklyn", "2026-01-15T03:00:00Z", 41.163851848081, 359.472891632627},
-	{"Polaris", "brooklyn", "2026-07-04T22:30:00Z", 40.197928953289, 359.471220482354},
-	{"Polaris", "brooklyn", "1982-05-03T06:00:00Z", 39.928482401642, 0.422392298012},
-	{"Polaris", "quito", "2026-01-15T03:00:00Z", 0.336127294678, 359.642824264762},
-	{"Polaris", "quito", "2026-07-04T22:30:00Z", -0.626202196523, 359.559572824116},
-	{"Polaris", "quito", "1982-05-03T06:00:00Z", -0.952654501631, 0.263881532596},
-	{"Polaris", "tromso", "2026-01-15T03:00:00Z", 69.223235031159, 358.685239986938},
-	{"Polaris", "tromso", "2026-07-04T22:30:00Z", 69.264301050259, 1.408575246107},
-	{"Polaris", "tromso", "1982-05-03T06:00:00Z", 69.997765802604, 2.138668372960},
-	{"Polaris", "auckland", "2026-01-15T03:00:00Z", -36.653296381021, 0.745271924290},
-	{"Polaris", "auckland", "2026-07-04T22:30:00Z", -36.297706805107, 359.628388599746},
-	{"Polaris", "auckland", "1982-05-03T06:00:00Z", -36.874064225402, 358.980853427804},
+	{"Sirius", "brooklyn", "2026-01-15T03:00:00Z", 30.689988297730, 162.193014075609},
+	{"Sirius", "brooklyn", "2026-07-04T22:30:00Z", -7.103158648039, 253.984684451110},
+	{"Sirius", "brooklyn", "1982-05-03T06:00:00Z", -45.061963922789, 288.969721762789},
+	{"Sirius", "quito", "2026-01-15T03:00:00Z", 63.900451777849, 130.448815397483},
+	{"Sirius", "quito", "2026-07-04T22:30:00Z", 9.238551282755, 253.051949087248},
+	{"Sirius", "quito", "1982-05-03T06:00:00Z", -39.106665093698, 248.113881106581},
+	{"Sirius", "tromso", "2026-01-15T03:00:00Z", -11.251165494507, 252.015434266336},
+	{"Sirius", "tromso", "2026-07-04T22:30:00Z", -37.085497184718, 357.390637620832},
+	{"Sirius", "tromso", "1982-05-03T06:00:00Z", -29.292029426190, 55.576234254323},
+	{"Sirius", "auckland", "2026-01-15T03:00:00Z", -16.904132331288, 127.172791890495},
+	{"Sirius", "auckland", "2026-07-04T22:30:00Z", 59.250039698099, 56.275535737147},
+	{"Sirius", "auckland", "1982-05-03T06:00:00Z", 60.436070953363, 306.411365071916},
+	{"Vega", "brooklyn", "2026-01-15T03:00:00Z", -9.522701713164, 349.129586705073},
+	{"Vega", "brooklyn", "2026-07-04T22:30:00Z", 22.205466456412, 57.197407088517},
+	{"Vega", "brooklyn", "1982-05-03T06:00:00Z", 57.784393927959, 79.361383333492},
+	{"Vega", "quito", "2026-01-15T03:00:00Z", -47.876623131948, 338.566556265420},
+	{"Vega", "quito", "2026-07-04T22:30:00Z", -5.943022906934, 50.966153120096},
+	{"Vega", "quito", "1982-05-03T06:00:00Z", 32.166289593835, 42.130852980491},
+	{"Vega", "tromso", "2026-01-15T03:00:00Z", 32.430495515287, 65.037464798565},
+	{"Vega", "tromso", "2026-07-04T22:30:00Z", 59.159172268566, 179.899867671213},
+	{"Vega", "tromso", "1982-05-03T06:00:00Z", 49.361862180626, 247.856284578229},
+	{"Vega", "auckland", "2026-01-15T03:00:00Z", -0.987994899805, 320.382859338238},
+	{"Vega", "auckland", "2026-07-04T22:30:00Z", -70.796647753298, 283.262915592297},
+	{"Vega", "auckland", "1982-05-03T06:00:00Z", -69.056342539818, 76.655575126672},
+	{"Betelgeuse", "brooklyn", "2026-01-15T03:00:00Z", 56.586151534329, 173.667088226371},
+	{"Betelgeuse", "brooklyn", "2026-07-04T22:30:00Z", -0.697063830909, 280.403453434505},
+	{"Betelgeuse", "brooklyn", "1982-05-03T06:00:00Z", -33.782827429396, 321.205480866860},
+	{"Betelgeuse", "quito", "2026-01-15T03:00:00Z", 78.961035301221, 46.382389290813},
+	{"Betelgeuse", "quito", "2026-07-04T22:30:00Z", -2.829288884302, 277.412403574593},
+	{"Betelgeuse", "quito", "1982-05-03T06:00:00Z", -53.190974895539, 282.171128898935},
+	{"Betelgeuse", "tromso", "2026-01-15T03:00:00Z", 7.159256571544, 272.016884680471},
+	{"Betelgeuse", "tromso", "2026-07-04T22:30:00Z", -12.615005536596, 10.420396958258},
+	{"Betelgeuse", "tromso", "1982-05-03T06:00:00Z", -2.591646056262, 60.468562910894},
+	{"Betelgeuse", "auckland", "2026-01-15T03:00:00Z", -24.221515090096, 99.229159873669},
+	{"Betelgeuse", "auckland", "2026-07-04T22:30:00Z", 43.852347092206, 19.345237889252},
+	{"Betelgeuse", "auckland", "1982-05-03T06:00:00Z", 33.795646823251, 314.055688283061},
+	{"Polaris", "brooklyn", "2026-01-15T03:00:00Z", 41.159247195163, 359.480550253897},
+	{"Polaris", "brooklyn", "2026-07-04T22:30:00Z", 40.193656494843, 359.472788245249},
+	{"Polaris", "brooklyn", "1982-05-03T06:00:00Z", 39.928110524098, 0.431136215664},
+	{"Polaris", "quito", "2026-01-15T03:00:00Z", 0.331050138703, 359.648178819394},
+	{"Polaris", "quito", "2026-07-04T22:30:00Z", -0.630560886020, 359.560403412495},
+	{"Polaris", "quito", "1982-05-03T06:00:00Z", -0.953521704187, 0.270541788762},
+	{"Polaris", "tromso", "2026-01-15T03:00:00Z", 69.229292044168, 358.697122040079},
+	{"Polaris", "tromso", "2026-07-04T22:30:00Z", 69.265590174792, 1.420567206006},
+	{"Polaris", "tromso", "1982-05-03T06:00:00Z", 70.004477246000, 2.139356011919},
+	{"Polaris", "auckland", "2026-01-15T03:00:00Z", -36.657007762248, 0.737322247984},
+	{"Polaris", "auckland", "2026-07-04T22:30:00Z", -36.297227553880, 359.622915393702},
+	{"Polaris", "auckland", "1982-05-03T06:00:00Z", -36.880160289282, 358.977331557795},
 }
 
 func TestStarPositionPinnedValues(t *testing.T) {
@@ -139,18 +141,20 @@ func TestStarPositionPinnedValues(t *testing.T) {
 
 // TestStarPositionAltitudeIndependent cross-checks the horizontal transform with
 // plain spherical trigonometry written out in the test, applied to the same
-// precessed equatorial position. It catches a wiring mistake in earth (wrong
+// apparent equatorial place. It catches a wiring mistake in earth (wrong
 // sidereal time, wrong longitude sign, wrong epoch) without reusing the
 // transform under test.
 func TestStarPositionAltitudeIndependent(t *testing.T) {
 	t.Parallel()
 	when := time.Date(2026, 2, 10, 2, 0, 0, 0, time.UTC)
-	gst := julian.GreenwichSiderealTime(when)
-	epochOfDate := 2000.0 + (julian.Date(when)-2451545.0)/365.25
+	gst := julian.ApparentSiderealTime(when)
+	jde := julian.TT(when)
+	dpsi, deps := ephemeris.Nutation(jde)
 	for _, name := range []string{"Sirius", "Vega"} {
 		s := mustStar(t, name)
-		eq := coordinates.PrecessEquatorial(
-			coordinates.Equatorial{RA: s.RA, Dec: s.Dec}, 2000.0, epochOfDate)
+		ra, dec := s.PositionAt(when)
+		ra, dec = ephemeris.ApparentFromJ2000(ra, dec, jde, dpsi, deps, s.Distance)
+		eq := coordinates.Equatorial{RA: ra, Dec: dec}
 		for _, obs := range []astronomy.Observer{brooklyn, quito, auckland} {
 			hz, err := earth.StarPosition(s, obs, when)
 			if err != nil {
