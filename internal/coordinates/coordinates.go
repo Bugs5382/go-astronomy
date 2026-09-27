@@ -29,6 +29,8 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
 import (
+	"math"
+
 	"github.com/Bugs5382/go-astronomy/internal/angles"
 	"github.com/Bugs5382/go-astronomy/internal/ephemeris"
 )
@@ -103,4 +105,20 @@ func HorizontalToEquatorial(hz Horizontal, latDeg, lonEastDeg, gstDeg float64) E
 	// Rotate the azimuth back to westward-from-south and negate the longitude.
 	ra, dec := ephemeris.HzToEq(hz.Azimuth-180, hz.Altitude, latDeg, -lonEastDeg, gstDeg)
 	return Equatorial{RA: angles.Normalize(ra), Dec: dec}
+}
+
+// PositionAngle returns the position angle, in degrees in [0, 360), of the
+// direction from the point (raDeg, decDeg) toward the point (ra0Deg,
+// dec0Deg): measured at the first point from the direction of the north
+// celestial pole, turning through east (Meeus 48.5, where it gives the bright
+// limb of the Moon from the Sun's place). Any spherical frame works: in the
+// horizontal frame, pass the negated azimuths as right ascensions and the
+// altitudes as declinations, and the angle is measured from the zenith.
+func PositionAngle(ra0Deg, dec0Deg, raDeg, decDeg float64) float64 {
+	d0 := angles.DegToRad(dec0Deg)
+	d := angles.DegToRad(decDeg)
+	dra := angles.DegToRad(ra0Deg - raDeg)
+	y := math.Cos(d0) * math.Sin(dra)
+	x := math.Sin(d0)*math.Cos(d) - math.Cos(d0)*math.Sin(d)*math.Cos(dra)
+	return angles.Normalize(angles.RadToDeg(math.Atan2(y, x)))
 }

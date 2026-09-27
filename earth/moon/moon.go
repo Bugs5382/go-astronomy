@@ -109,6 +109,18 @@ func validateObserver(obs astronomy.Observer) error {
 // the same observer-to-Moon distance, so the disc size and the altitude
 // describe one Moon from one vantage point (issue 44).
 func topocentric(obs astronomy.Observer, t time.Time) (coordinates.Horizontal, float64) {
+	ra, dec, topoDist, gst := topocentricEquatorial(obs, t)
+	hz := coordinates.EquatorialToHorizontal(
+		coordinates.Equatorial{RA: ra, Dec: dec}, obs.Lat, obs.Lng, gst)
+
+	semiDeg := angles.RadToDeg(math.Asin(moonMeanRadiusKm / topoDist))
+	return hz, semiDeg
+}
+
+// topocentricEquatorial returns the Moon's topocentric apparent right
+// ascension and declination in degrees, its distance from the observer in km,
+// and the Greenwich apparent sidereal time in degrees, at t.
+func topocentricEquatorial(obs astronomy.Observer, t time.Time) (raDeg, decDeg, distKm, gstDeg float64) {
 	// The lunar theory runs on Terrestrial Time and gives the mean equinox of
 	// date; nutation moves it to the true equinox the Sun uses, and apparent
 	// sidereal time matches that frame (issue 45).
@@ -117,14 +129,10 @@ func topocentric(obs astronomy.Observer, t time.Time) (coordinates.Horizontal, f
 	dpsi, deps := ephemeris.Nutation(jde)
 	eq := coordinates.EclipticToEquatorial(
 		coordinates.Ecliptic{Lon: lam + dpsi, Lat: bet}, ephemeris.MeanObliquity(jde)+deps)
-	gst := julian.ApparentSiderealTime(t)
+	gstDeg = julian.ApparentSiderealTime(t)
 
-	ra, dec, topoDist := ephemeris.Topocentric(eq.RA, eq.Dec, dist, obs.Lat, obs.Height.Meters(), gst+obs.Lng)
-	hz := coordinates.EquatorialToHorizontal(
-		coordinates.Equatorial{RA: ra, Dec: dec}, obs.Lat, obs.Lng, gst)
-
-	semiDeg := angles.RadToDeg(math.Asin(moonMeanRadiusKm / topoDist))
-	return hz, semiDeg
+	raDeg, decDeg, distKm = ephemeris.Topocentric(eq.RA, eq.Dec, dist, obs.Lat, obs.Height.Meters(), gstDeg+obs.Lng)
+	return raDeg, decDeg, distKm, gstDeg
 }
 
 // position builds the public Position value from the topocentric coordinates.
