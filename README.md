@@ -72,6 +72,31 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 - 🕛 **Seamless midnight rollover** — `earth.SegmentAt` answers "which band, and how far through it, at `now`" and stitches across midnight with no gap. Callers ask only for `now`, never for the previous or next day.
 - 🧵 **Stateless & concurrency-safe** — every call takes the observer and `time.Time`; nothing is captured at construction, so the same instance serves many visitors at once.
 
+## 🌓 Which way the Moon is lit
+
+`moon.BrightLimbAt` says which way the Moon's lit side faces, as numbers rather than a guess from the phase name. It returns three angles in degrees, all turning counter-clockwise as the observer sees the sky (90 is left of the reference, 270 right):
+
+- `PositionAngle`: from celestial north through east (Meeus 48.5). A property of the sky.
+- `Parallactic`: the angle from celestial north to the zenith at the Moon (Meeus 14.1).
+- `ZenithAngle`: `PositionAngle − Parallactic`, measured from "up" on the observer's sky. This is the one a screen needs.
+
+### Drawing the crescent
+
+```go
+obs := astronomy.Observer{Lat: 39.74, Lng: -104.99}
+when := time.Date(2027, 6, 8, 4, 0, 0, 0, time.UTC) // a June evening crescent, low in the west
+
+bl, err := moon.BrightLimbAt(obs, when)
+if err != nil {
+	panic(err)
+}
+// ZenithAngle = 230.5: between down (180) and right (270), toward the set Sun.
+a := bl.ZenithAngle * math.Pi / 180
+x, y := -math.Sin(a), -math.Cos(a) // screen vector toward the lit side (x right, y down): 0.77, 0.64
+```
+
+The angle points at the Sun even below the horizon, because both bodies use their topocentric apparent places. Near New and Full Moon (under about 0.1% or over 99.9% lit) there is no visible bright limb to orient, and the angle should be treated as undefined. Against JPL Horizons DE441 (`PsAng`) the position angle agrees to within 0.01°.
+
 ## 📋 Requirements
 
 - Go **`>= 1.27`**
