@@ -42,7 +42,9 @@ type Observer struct {
 	//
 	// From height the sea horizon lies below the astronomical horizon by the
 	// dip (see earth.HorizonDip), so the Sun and Moon rise earlier and set
-	// later; the height also enters their parallax. The dip assumes an
+	// later, and the thinner air refracts less (see earth.StandardAtmosphere),
+	// which gives a little of that back; the height also enters their
+	// parallax. The dip assumes an
 	// unobstructed sea horizon. For an observer in motion, such as a plane,
 	// pass the position and height for each instant to each call.
 	Height Height

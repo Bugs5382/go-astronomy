@@ -17,7 +17,7 @@ type Observer struct {
 }
 ```
 
-An observer's height above sea level is optional. From height the sea horizon lies below the astronomical horizon by the dip, so the Sun and Moon rise earlier and set later, and the height enters their parallax (under an arc second). Every function that takes an `Observer` uses its height: `earth.NewSunTimes`, `earth.SegmentAt`, `earth.SunPosition`, the Moon's `Position`, `NextRise`, and `NextSet`, and every planet package's `Position`, `NextRise`, `NextSet`, and `NextTransit`.
+An observer's height above sea level is optional. From height the sea horizon lies below the astronomical horizon by the dip, so the Sun and Moon rise earlier and set later, less a little because the thinner air refracts less, and the height enters their parallax (under an arc second). Every function that takes an `Observer` uses its height: `earth.NewSunTimes`, `earth.SegmentAt`, `earth.SunPosition`, the Moon's `Position`, `NextRise`, and `NextSet`, and every planet package's `Position`, `NextRise`, `NextSet`, and `NextTransit`.
 
 ## 📏 Height
 
@@ -58,7 +58,7 @@ high := astronomy.Observer{Lat: 40.71, Lng: -74.01, TZ: time.UTC, Height: astron
 same := astronomy.Observer{Lat: 40.71, Lng: -74.01, TZ: time.UTC, Height: astronomy.Meters(1524)}
 fmt.Println(high == same)                        // true
 fmt.Printf("%.3f\n", earth.HorizonDip(high.Height)) // 1.145 degrees
-// sunrise 7.2 minutes earlier than at sea level
+// sunrise 6.7 minutes earlier than at sea level
 ```
 
 ### Lookup
@@ -157,7 +157,7 @@ for _, f := range []float64{0, 0.25, 0.5, 0.7, 0.75, 1} {
 	obs := astronomy.Observer{Lat: lat, Lng: lng, Height: height}
 	when := depart.Add(time.Duration(f * float64(7*time.Hour)))
 	sun := earth.SunPosition(obs, when)
-	horizon := earth.HorizonAltitude - earth.HorizonDip(obs.Height)
+	horizon := earth.HorizonAltitudeAt(obs.Height) // dipped, and less refraction in thin air
 	fmt.Println(when.Format("15:04"), sun.Altitude > horizon, sun.Altitude > earth.HorizonAltitude)
 }
 ```
@@ -176,6 +176,7 @@ The full program, with the great-circle helper, is `Example_flightNYCToLondon` i
 ## 🎯 The dip, accuracy, and limits
 
 - **The dip:** `earth.HorizonDip(h)` is `1.76′ × √h` for `h` in metres (`earth.DipArcminPerRootMetre`). That is the observed dip from the Nautical Almanac, which includes standard terrestrial refraction. It is zero at or below sea level. At 36000 ft it is 3.07°.
+- **Refraction at height:** the dip lowers the horizon, and the thinner air above sea level raises it back a little, because the 34′ of refraction that lifts a body on the horizon scales with the air's density. By default the library takes that air from the ISA standard atmosphere (`earth.StandardAtmosphere`), which is exactly the sea-level refraction at sea level: 0.85 of it at Denver, 0.31 at 35000 ft. `earth.HorizonAltitudeAt(h)` combines the two for the Sun (−1.93° at Denver, −3.47° at 35000 ft), and `earth.MeasuredAtmosphere(p, t)` takes a local pressure and temperature. See [Refraction and height](./earth.md#-refraction-and-height).
 - **Twilight:** by the USNO convention, only sunrise and sunset move. `earth.DefaultSegmentation` marks only those levels `DipCorrected`, and `Segmentation.WithTwilightDip()` moves every level.
 - **The horizon it assumes:** the dip assumes an unobstructed sea horizon. It is right on a mountaintop, a coast, or in the air, and optimistic in a valley, where terrain hides the horizon and sunrise comes later. A height looked up from a DEM is a grid-cell average, not the ground under the observer.
-- **Against JPL Horizons:** Horizons' "true visual horizon" uses the geometric dip `1.93′ × √h`. At Denver and La Paz this library rises up to about 30 s later and sets up to about 75 s earlier than Horizons TVH, and it agrees within Horizons' one-minute step at sea level. The package tests pin both.
+- **Against JPL Horizons:** Horizons' "true visual horizon" uses the geometric dip `1.93′ × √h` and refracts with the sea-level air at any height. With the same sea-level air (`earth.MeasuredAtmosphere(1010, 10)`) this library rises up to about 30 s later and sets up to about 75 s earlier than Horizons TVH at Denver and La Paz, and it agrees within Horizons' one-minute step at sea level. The thinner standard air moves the events at height by another 15 to 70 s, sunrise later and sunset earlier. The package tests pin all three.

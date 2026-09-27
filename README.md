@@ -218,7 +218,7 @@ The angle points at the Sun even below the horizon, because both bodies use thei
 
 ## ⛰️ Observer height
 
-An `Observer`'s height above sea level is optional. From height the sea horizon lies below the astronomical horizon by the dip, so the Sun, the Moon, and the planets rise earlier and set later (7.3 minutes at Denver's 1609 m in June), and the height enters their parallax. There are three ways to give an observer its height.
+An `Observer`'s height above sea level is optional. From height the sea horizon lies below the astronomical horizon by the dip, so the Sun, the Moon, and the planets rise earlier and set later, and the height enters their parallax. The air up there is thinner, so it refracts less and gives a little of that back: at Denver's 1609 m in June sunrise comes 6.8 minutes earlier, 7.3 for the dip less half a minute for the refraction (see Dip and refraction below). There are three ways to give an observer its height.
 
 ### Always sea level
 
@@ -234,7 +234,7 @@ Set `Height` with `astronomy.Feet` or `astronomy.Meters` (1 ft = 0.3048 m exactl
 
 ```go
 obs := astronomy.Observer{Lat: 40.71, Lng: -74.01, TZ: tz, Height: astronomy.Feet(5000)} // same as Meters(1524)
-day, err := earth.NewSunTimes(obs, date) // sunrise 7.2 minutes earlier than at sea level
+day, err := earth.NewSunTimes(obs, date) // sunrise 6.7 minutes earlier than at sea level
 ```
 
 Only NaN and the infinities are invalid: every function that returns an error rejects them with `astronomy.ErrInvalidHeight` (code 7011), and `Height.Err()` checks one up front.
@@ -260,16 +260,38 @@ The `openmeteo` resolver respects `ctx`, bounds each lookup with a default 10 s 
 
 ### Moving observers
 
-A caller in motion, such as a plane, passes the position and height for each instant to each time-based call. `Example_flightNYCToLondon` follows a JFK to Heathrow flight at 36000 ft: at 04:54 UTC over the Atlantic the Sun is up for the plane (-2.43°, above its dipped horizon of -3.91°) but not yet for the ocean below.
+A caller in motion, such as a plane, passes the position and height for each instant to each time-based call. `Example_flightNYCToLondon` follows a JFK to Heathrow flight at 36000 ft: at 04:54 UTC over the Atlantic the Sun is up for the plane (-2.43°, above its horizon of -3.51°) but not yet for the ocean below.
 
 ```go
 for _, f := range []float64{0, 0.25, 0.5, 0.7, 0.75, 1} {
 	lat, lng := greatCircle(jfk, lhr, f) // the point f of the way along the route
 	obs := astronomy.Observer{Lat: lat, Lng: lng, Height: astronomy.Feet(36000)}
 	sun := earth.SunPosition(obs, depart.Add(time.Duration(f*float64(7*time.Hour))))
-	up := sun.Altitude > earth.HorizonAltitude-earth.HorizonDip(obs.Height)
+	up := sun.Altitude > earth.HorizonAltitudeAt(obs.Height) // dip and thinner air
 	_ = up
 }
+```
+
+### 🌫️ Dip and refraction
+
+Two things move the horizon for an observer above sea level, and they pull in opposite directions:
+
+- 📉 **The dip lowers it.** The sea horizon lies `1.76′ × √h` below the astronomical horizon (`earth.HorizonDip`, the Nautical Almanac value, which already includes the bending of the line of sight down to the sea).
+- 📈 **Thinner air raises it back a little.** The 34′ of refraction that lifts a body on the horizon scales with the density of the air. By default the library takes the air at the observer's height from the ISA standard atmosphere (`earth.StandardAtmosphere`): its factor is exactly 1 at sea level, so sea-level answers do not change, and it follows the ISA layers well past 15 km.
+
+| height | dip | refraction factor | Sun's centre at sunrise |
+| --- | --- | --- | --- |
+| sea level | 0° | 1.000 | −0.833° |
+| 1524 m (5000 ft) | 1.145° | 0.862 | −1.900° |
+| 1609 m (Denver) | 1.177° | 0.854 | −1.927° |
+| 10668 m (35000 ft) | 3.030° | 0.311 | −3.472° |
+
+`earth.HorizonAltitudeAt(h)` gives the last column. The Sun, the Moon's and the planets' rise and set, and the Moon's `ApparentPosition` all use the scaled refraction. With a local reading of station pressure and temperature, pass the measured air instead: it applies the absolute factor `P/1010 × 283/(273+T)`.
+
+```go
+cold := earth.MeasuredAtmosphere(845, -15) // hPa, °C, at the observer
+day, err := earth.NewSunTimesWith(obs, date, earth.DefaultSegmentation.WithAtmosphere(cold))
+r := cold.Refraction(apparentAlt, obs.Height) // degrees, for any altitude
 ```
 
 ## 📋 Requirements

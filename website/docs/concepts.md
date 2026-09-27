@@ -62,7 +62,7 @@ Everything else in the library is a pure function of an observer and an instant.
 
 ## ⛰️ Height and the horizon
 
-An observer's height moves the horizon, not the sky. From height the sea horizon sits below the astronomical horizon by the dip, so rise and set move while positions barely change (the height shifts the Sun's and Moon's parallax by under an arc second). The height is optional: leave it out for sea level and no network, set it by hand in feet or metres, or look it up with a resolver. The calculation functions never look anything up. A moving observer, such as a plane, passes its position and height for each instant. See [Observer and height](./reference/observer.md).
+An observer's height moves the horizon, not the sky. From height the sea horizon sits below the astronomical horizon by the dip, so rise and set move while positions barely change (the height shifts the Sun's and Moon's parallax by under an arc second). The air up there is thinner and refracts less, which raises the horizon threshold back a little: the dip and the refraction are modelled together, with the refraction scaled by the ISA standard atmosphere, or by a measured pressure and temperature (see [Refraction and height](./reference/earth.md#-refraction-and-height)). The height is optional: leave it out for sea level and no network, set it by hand in feet or metres, or look it up with a resolver. The calculation functions never look anything up. A moving observer, such as a plane, passes its position and height for each instant. See [Observer and height](./reference/observer.md).
 
 ## 🎯 Accuracy
 

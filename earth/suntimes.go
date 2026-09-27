@@ -101,10 +101,14 @@ func NewSunTimes(obs astronomy.Observer, date time.Time) (*SunTimes, error) {
 // NewSunTimesWith is NewSunTimes with a caller-supplied Segmentation, letting a
 // consumer redefine the thresholds and labels wholesale. For an observer above
 // sea level the segmentation's horizon and its dip-corrected levels are
-// lowered by the horizon dip first; the result must still be strictly
-// ascending.
+// lowered by the horizon dip first, and its refracted levels are moved for the
+// segmentation's Atmosphere; the result must still be strictly ascending.
+// Measured air that cannot exist is rejected with ErrInvalidAtmosphere.
 func NewSunTimesWith(obs astronomy.Observer, date time.Time, seg Segmentation) (*SunTimes, error) {
 	if err := validateObserver(obs); err != nil {
+		return nil, err
+	}
+	if err := seg.Atmosphere.Err(); err != nil {
 		return nil, err
 	}
 	seg = seg.atHeight(obs.Height)
@@ -438,6 +442,9 @@ func SegmentAt(obs astronomy.Observer, t time.Time) (Segment, float64, error) {
 // the observer's height as in NewSunTimesWith.
 func SegmentAtWith(obs astronomy.Observer, t time.Time, seg Segmentation) (Segment, float64, error) {
 	if err := validateObserver(obs); err != nil {
+		return Segment{}, 0, err
+	}
+	if err := seg.Atmosphere.Err(); err != nil {
 		return Segment{}, 0, err
 	}
 	seg = seg.atHeight(obs.Height)
