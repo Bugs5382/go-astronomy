@@ -41,7 +41,7 @@ Module path: `github.com/Bugs5382/go-astronomy`
 | `github.com/Bugs5382/go-astronomy/satellite/horizons` | explicit fetcher | JPL Horizons tables over a window (30 days at 1 h), cached and interpolated locally; `NewTracker`. |
 | `github.com/Bugs5382/go-astronomy/satellite/{jwst,roman}` | L2 telescopes | `New(horizons.Client)`: `Position` only (no SGP4 or passes at L2). |
 | `github.com/Bugs5382/go-astronomy/openmeteo` | optional adapter | `astronomy.ElevationResolver` backed by the Open-Meteo elevation API (`New`, `ResolveObserver`, in-process cache, go-log logging). The only package that reaches the network. |
-| `github.com/Bugs5382/go-astronomy/internal/...` | internal | Math core (`angles`, `julian`, `coordinates`, `ephemeris`, `project`). Unexported by policy — do not import. |
+| `github.com/Bugs5382/go-astronomy/internal/...` | internal | Math core (`angles`, `julian`, `coordinates`, `ephemeris`, `elp` for the lunar series, `project`). Unexported by policy — do not import. |
 
 Only the Sun is universal to the solar system. Moons are body-specific (Luna
 lives under `earth`). Import the universal packages plus the one body package you
@@ -120,7 +120,7 @@ func main() {
    without notice. Consume only the packages in the map above.
 8. **Accuracy is arcminute-class.** The Sun and Moon run on Terrestrial Time
    (ΔT from the IERS leap-second table) with nutation, and match JPL Horizons
-   to within about 10″ (Moon) and 2″ (Sun, from VSOP87). Star positions still omit nutation
+   to within about 0.5″ geocentric for the Moon (ELP 2000-82B) and 2″ for the Sun (VSOP87). Star positions still omit nutation
    and aberration. Do not rely on the library for higher-precision ephemeris
    work.
 

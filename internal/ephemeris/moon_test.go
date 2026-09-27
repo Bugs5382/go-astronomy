@@ -32,15 +32,17 @@ import (
 // 1992 April 12.0 TD.
 const example47a = 2448724.5
 
-// TestMoonPosition anchors the truncated lunar series against Meeus example
-// 47.a, which gives geocentric ecliptic longitude 133.162655 degrees, latitude
-// -3.229126 degrees, and an Earth-Moon distance of 368409.7 kilometres.
+// TestMoonPosition anchors the chapter 47 series, MoonPositionMeeus, against
+// Meeus example 47.a, which gives geocentric ecliptic longitude 133.162655
+// degrees, latitude -3.229126 degrees, and an Earth-Moon distance of 368409.7
+// kilometres. MoonPosition itself is the ELP 2000-82B series, checked against
+// JPL DE441 in internal/elp.
 //
 // The longitude and latitude are referred to the mean equinox of date and do
 // not include nutation, which is what the book's example computes.
 func TestMoonPosition(t *testing.T) {
 	t.Parallel()
-	lon, lat, dist := MoonPosition(example47a)
+	lon, lat, dist := MoonPositionMeeus(example47a)
 	if math.Abs(lon-133.162655) > 1e-6 {
 		t.Errorf("longitude = %.7f, want 133.162655", lon)
 	}

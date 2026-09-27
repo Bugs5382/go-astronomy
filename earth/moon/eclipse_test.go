@@ -38,14 +38,15 @@ import (
 	"github.com/Bugs5382/go-astronomy/earth/moon"
 )
 
-// Tolerances for the Sun and Moon against JPL Horizons DE441 (issue 45). The
-// Moon's truncated chapter 47 series is good to about 10 arc seconds, and it
-// now sets the eclipse timing: the Sun runs on VSOP87 and is observed within
-// 1.4 arc seconds here. The closest approach is observed within 10 s.
+// Tolerances for the Sun and Moon against JPL Horizons DE441 (issues 45 and
+// 37). The Moon runs on the ELP 2000-82B series and is observed within 1.5 arc
+// seconds here (the chapter 47 series it replaced was off by up to 6.2), and
+// the Sun on VSOP87 within 1.4. The closest approach is observed within 3.2 s
+// (it was 9.3 s with chapter 47).
 const (
-	moonToleranceArcsec = 15
+	moonToleranceArcsec = 3
 	sunToleranceArcsec  = 5
-	closestApproachTol  = 20 * time.Second
+	closestApproachTol  = 5 * time.Second
 )
 
 // eclipseRow is one ten-second sample of a committed Horizons eclipse fixture.
