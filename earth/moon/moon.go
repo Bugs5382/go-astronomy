@@ -95,7 +95,8 @@ func validateObserver(obs astronomy.Observer) error {
 	if obs.Lng < -180 || obs.Lng > 180 {
 		return apperr.Coded(astronomy.CodeInvalidLongitude, ErrInvalidLongitude)
 	}
-	return nil
+	// A NaN or infinite height; any real height is used as given.
+	return obs.Height.Err()
 }
 
 // topocentric returns the Moon's topocentric horizontal coordinates (geometric,
@@ -118,7 +119,7 @@ func topocentric(obs astronomy.Observer, t time.Time) (coordinates.Horizontal, f
 		coordinates.Ecliptic{Lon: lam + dpsi, Lat: bet}, ephemeris.MeanObliquity(jde)+deps)
 	gst := julian.ApparentSiderealTime(t)
 
-	ra, dec, topoDist := ephemeris.Topocentric(eq.RA, eq.Dec, dist, obs.Lat, 0, gst+obs.Lng)
+	ra, dec, topoDist := ephemeris.Topocentric(eq.RA, eq.Dec, dist, obs.Lat, obs.Height.Meters(), gst+obs.Lng)
 	hz := coordinates.EquatorialToHorizontal(
 		coordinates.Equatorial{RA: ra, Dec: dec}, obs.Lat, obs.Lng, gst)
 

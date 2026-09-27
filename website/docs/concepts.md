@@ -52,6 +52,10 @@ Pass a zone-aware `time.Time` on every call. The library computes internally in 
 
 At high latitudes the Sun may not cross the horizon on a given day. That is an explicit state, never a nil panic or a `-1` sentinel. `SunTimes.Polar()` returns a `PolarState` of `MidnightSun` (Sun up all day) or `PolarNight` (Sun down all day) with a boolean that is false on an ordinary day. Absence in general is explicit throughout the API: `(value, bool)` or `(value, error)` where a result may not exist, for example no sunrise during a polar day.
 
+## ⛰️ Height and the horizon
+
+An observer's height moves the horizon, not the sky. From height the sea horizon sits below the astronomical horizon by the dip, so rise and set move while positions barely change (the height shifts the Sun's and Moon's parallax by under an arc second). The height is optional: leave it out for sea level and no network, set it by hand in feet or metres, or look it up with a resolver. The calculation functions never look anything up. A moving observer, such as a plane, passes its position and height for each instant. See [Observer and height](./reference/observer.md).
+
 ## 🎯 Accuracy
 
 The target is amateur, arcminute-class accuracy, using an in-house implementation of the Meeus algorithms. The Sun and Moon are computed on Terrestrial Time, with ΔT taken from the IERS leap-second table, and include nutation and the observer's parallax; against JPL Horizons DE441 the Moon is good to about 10″ and the Sun, from the VSOP87 series, to about 2″. Star positions still omit nutation and aberration. Do not rely on the library for higher-precision ephemeris work.

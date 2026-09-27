@@ -66,7 +66,7 @@ func NextRise(obs astronomy.Observer, t time.Time) (time.Time, bool, error)
 func NextSet(obs astronomy.Observer, t time.Time) (time.Time, bool, error)
 ```
 
-`NextRise` and `NextSet` return the first instant strictly after `t` at which the Moon's upper limb crosses the horizon, and a boolean that is false when no crossing occurs within the search window (which can happen at high latitudes, where the Moon can stay above or below the horizon for many days). The search spans a full synodic month. Both return a coded error for an out-of-range observer.
+`NextRise` and `NextSet` return the first instant strictly after `t` at which the Moon's upper limb crosses the horizon, and a boolean that is false when no crossing occurs within the search window (which can happen at high latitudes, where the Moon can stay above or below the horizon for many days). The search spans a full synodic month. For an observer above sea level the horizon is lowered by the dip (see [Observer and height](./observer.md)), so the Moon rises earlier and sets later. Both return a coded error for an out-of-range observer, including `astronomy.ErrInvalidHeight` for a NaN or infinite height.
 
 ## 📈 Track
 

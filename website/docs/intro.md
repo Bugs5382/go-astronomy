@@ -28,6 +28,7 @@ sidebar_position: 1
 | `.../constellation` | universal | IAU boundary lookup by RA/Dec. |
 | `.../earth` | Earth traits | Sun position and track, twilight bands, refraction, polar states, seasons, ground darkness, and star projection for an Earth observer. |
 | `.../earth/moon` | Earth traits | Luna: position, apparent position, phases, rise/set, and an arc track. |
+| `.../openmeteo` | optional adapter | Looks an observer's height up from the Open-Meteo elevation API. The only package that reaches the network. |
 
 Adding a future body (for example `mars/`) would not change `sun`, `star`, or `constellation`.
 

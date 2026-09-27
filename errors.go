@@ -70,6 +70,8 @@ const (
 	// CodeXModeNotAzimuth marks a column-to-azimuth inverse query on a projection
 	// whose horizontal mode is not azimuth-based, so no azimuth axis exists.
 	CodeXModeNotAzimuth = 7010
+	// CodeInvalidHeight marks an observer Height that is NaN or infinite.
+	CodeInvalidHeight = 7011
 )
 
 // errorEntries is the module's code table. It feeds the go-apperr registry that
@@ -85,6 +87,7 @@ var errorEntries = []apperr.Entry{
 	{Code: CodeInvalidFieldOfView, Title: "projection", Cause: "azimuth field of view or arc span not positive"},
 	{Code: CodeInvalidElevationScale, Title: "projection", Cause: "geometric elevation degrees-per-pixel not positive"},
 	{Code: CodeXModeNotAzimuth, Title: "projection", Cause: "column-to-azimuth query on a non-azimuth horizontal mode"},
+	{Code: CodeInvalidHeight, Title: "observer", Cause: "observer height is NaN or infinite"},
 }
 
 // logSink adapts a go-log Logger to the go-apperr Logger interface. It is the
