@@ -74,8 +74,14 @@ func SunGeometric(jde float64) (lonDeg, latDeg, distanceAU float64) {
 // for the actual distance, 20.4898 arc seconds divided by the distance in
 // astronomical units (Meeus 25.10).
 func SunApparentEcliptic(jde float64) (lonDeg, latDeg, distanceAU float64) {
-	lon, lat, r := SunGeometric(jde)
 	dpsi, _ := Nutation(jde)
+	return sunApparentEcliptic(jde, dpsi)
+}
+
+// sunApparentEcliptic is SunApparentEcliptic with the nutation in longitude
+// already known.
+func sunApparentEcliptic(jde, dpsi float64) (lonDeg, latDeg, distanceAU float64) {
+	lon, lat, r := SunGeometric(jde)
 	return pmod(lon+dpsi-20.4898/arcsecPerDeg/r, 360), lat, r
 }
 
@@ -84,8 +90,15 @@ func SunApparentEcliptic(jde float64) (lonDeg, latDeg, distanceAU float64) {
 // Julian ephemeris day, referred to the true equator and equinox of date
 // (issue 45).
 func SunApparent(jde float64) (raDeg, decDeg, distKm float64) {
-	lon, lat, r := SunApparentEcliptic(jde)
-	raDeg, decDeg = EclToEq(lon, lat, TrueObliquity(jde))
+	return SunApparentNutated(jde, NutationAt(jde))
+}
+
+// SunApparentNutated is SunApparent with the nutation at jde already
+// evaluated, for a caller that needs it again (the apparent sidereal time).
+// It gives exactly SunApparent's result.
+func SunApparentNutated(jde float64, n Nutated) (raDeg, decDeg, distKm float64) {
+	lon, lat, r := sunApparentEcliptic(jde, n.DPsi)
+	raDeg, decDeg = EclToEq(lon, lat, n.TrueObliquity())
 	return raDeg, decDeg, r * KmPerAU
 }
 

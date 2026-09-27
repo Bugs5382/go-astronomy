@@ -28,6 +28,12 @@ func SunTrack(obs astronomy.Observer, date time.Time, samples int) []SunSample
 - `SunPosition` returns the geometric alt/az of the Sun's disc center, paired with its apparent diameter, at instant `t`. A negative altitude is below the horizon and is a valid answer, so there is no error return.
 - `SunTrack` samples the Sun's arc across the civil day containing `date`, resolved in the observer's time zone from local midnight to the next local midnight. Exactly `samples` points are returned, evenly spaced in time and inclusive of both endpoints; the span honors daylight-saving transitions (23 or 25 hours). Fewer than two samples returns `nil`.
 
+### ⚡ Cost
+
+A single `SunPosition` evaluates VSOP87 and the nutation, about 1.6 µs. The paths that sample the Sun many times share that work across nearby instants. They compute the Sun's apparent geocentric place once per whole UTC hour and interpolate it between hours; the sidereal time, the parallax and the horizon are still computed for each instant. `NewSunTimes` and `SegmentAt` resolve a day in about 0.45 ms, and a `SunTrack` with more samples than the day has hours takes about 0.2 µs a sample.
+
+The interpolated place is within 1e-9° of `SunPosition` (a few millionths of an arc second) and exact at whole hours. A day's band boundaries move by under 0.1 s from direct positions, inside the 0.2 s the crossing search resolves. The package tests pin both limits, and the JPL Horizons rise and set fixtures pass unchanged. A `SunTrack` of 32 samples or fewer uses `SunPosition` directly.
+
 ## 🌇 Twilight bands (SunTimes)
 
 ```go
