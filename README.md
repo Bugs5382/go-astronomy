@@ -156,7 +156,32 @@ l, err := tracker.Position(ctx, denver, now) // l.Altitude, l.Azimuth, l.RangeKm
 
 - **`celestrak`** caches each element set per catalogue number for 24 hours and never refetches sooner than every 2 hours, following CelesTrak's guidance. Every position and pass is propagated locally from the cached set. A failed refresh returns an error, and a cached set comes back only flagged stale.
 - **`horizons`** fetches a 30-day table at a one-hour step in one request, caches it, and interpolates locally (eight-point Lagrange, within 4.4 milliarcseconds of a ten-minute table). It refetches only when an instant leaves the window.
-- **Shared behaviour.** Both take `ctx`, have a default timeout, accept an injected `*http.Client`, and use a pluggable `satellite.Cache`. You can back that cache with Redis to share fetches across replicas; go-astronomy itself has no Redis dependency.
+- **Shared behaviour.** Both take `ctx`, have a default timeout, accept an injected `*http.Client`, and use a pluggable `satellite.Cache`.
+- **What is cached.** CelesTrak sets are cached by catalogue number only, never per observer or time, so one daily fetch serves every observer at every time; positions and passes are always propagated locally.
+- **Restarts and replicas.** The default in-memory cache is lost on restart. To keep sets across restarts and share them between replicas, implement the two-method `satellite.Cache` over Redis in your own code (go-astronomy has no Redis dependency):
+
+```go
+// RedisCache adapts a go-redis client to satellite.Cache. It lives in your
+// code; go-astronomy has no Redis dependency.
+type RedisCache struct{ R *redis.Client }
+
+func (c RedisCache) Get(ctx context.Context, key string) ([]byte, bool, error) {
+	b, err := c.R.Get(ctx, key).Bytes()
+	if errors.Is(err, redis.Nil) {
+		return nil, false, nil
+	}
+	return b, err == nil, err
+}
+
+func (c RedisCache) Set(ctx context.Context, key string, v []byte, expiry time.Duration) error {
+	return c.R.Set(ctx, key, v, expiry).Err() // an expiry of 0 keeps it
+}
+
+elements := celestrak.New(celestrak.WithCache(RedisCache{R: rdb}))
+tracker := iss.New(elements)
+```
+
+- **Staleness.** A set's error grows with age, roughly a few kilometres a day for the ISS (drag, and reboosts every few weeks). A daily refresh keeps that to a few kilometres, well under a second of pass timing; `Elements.Age` says how old a set is.
 
 ### Why JWST and Roman have no Passes
 

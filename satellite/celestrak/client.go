@@ -9,8 +9,13 @@
 // default, and never refetched sooner than every 2 hours, following
 // CelesTrak's usage guidance (a set is updated a few times a day; download it
 // once and reuse it). Every position and pass is then propagated locally from
-// the cached set. The cache is pluggable (satellite.Cache), so replicas can
-// share one store across restarts.
+// the cached set. Sets are cached by catalogue number only, never per
+// observer or time, so one fetch serves every observer at every instant.
+//
+// The default cache is in-process and is lost on restart. The cache is
+// pluggable (satellite.Cache), so a caller can back it with its own store,
+// such as Redis, to keep sets across restarts and share them between
+// replicas.
 //
 // A failed fetch returns an error. When a set was cached, it is returned too,
 // marked stale, with an error wrapping satellite.ErrStaleElements, and the
