@@ -121,3 +121,22 @@ func SolarApparentEquatorial(jde float64) (raDeg, decDeg float64) {
 	dec := math.Asin(sinEps * sinLon)
 	return pmod(degrees(ra), 360), degrees(dec)
 }
+
+// auKm is the astronomical unit in km (IAU 2012 Resolution B2).
+const auKm = 149597870.7
+
+// SunApparent returns the Sun's apparent geocentric right ascension, in
+// degrees in [0, 360), declination in degrees, and distance in km at the given
+// Julian ephemeris day. It starts from the same geometric longitude and radius
+// as SolarApparentEquatorial but applies the full nutation in longitude, the
+// aberration for the actual distance (Meeus 25.10), and the true obliquity, so
+// the result is on the same true equator and equinox as the Moon (issue 45).
+func SunApparent(jde float64) (raDeg, decDeg, distKm float64) {
+	t := J2000Century(jde)
+	lon, _ := SolarTrueLongitude(t)
+	r := SolarRadius(t)
+	dpsi, deps := Nutation(jde)
+	lon += dpsi - 20.4898/arcsecPerDeg/r
+	raDeg, decDeg = EclToEq(lon, 0, MeanObliquity(jde)+deps)
+	return raDeg, decDeg, r * auKm
+}

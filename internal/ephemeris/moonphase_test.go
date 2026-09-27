@@ -313,16 +313,16 @@ var ephemerisLunarPhases = []struct {
 // TestLunarPhasesAgainstEphemeris measures the phase series against a modern
 // numerical ephemeris.
 //
-// The series returns dynamical time and this library does not model Delta-T, so
-// the instant it hands back is about seventy seconds later than the civil
-// instant in the present era. Meeus gives the accuracy of the chapter 49 series
-// itself as a few seconds over the modern range. The three minute tolerance
-// covers both, and both are documented limits rather than defects.
+// The series returns dynamical time, which JDEToTime converts to UTC with the
+// leap-second table (issue 45). What remains is the series itself, which Meeus
+// gives as good to a few seconds over the modern range; the fixtures are also
+// interpolated at twenty-minute steps. The observed error is under 8 s, and
+// the tolerance is 15 s.
 func TestLunarPhasesAgainstEphemeris(t *testing.T) {
 	t.Parallel()
-	const tol = 3 * time.Minute
+	const tol = 15 * time.Second
 	for _, c := range ephemerisLunarPhases {
-		got := JDToTime(c.fn(c.year))
+		got := JDEToTime(c.fn(c.year))
 		if d := got.Sub(c.utc); d > tol || d < -tol {
 			t.Errorf("%s = %v, ephemeris %v (%v off)", c.name, got.UTC(), c.utc, d)
 		}

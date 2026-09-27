@@ -68,3 +68,24 @@ func LocalSiderealTime(t time.Time, lonEastDeg float64) float64 {
 func MeanObliquity(t time.Time) float64 {
 	return ephemeris.MeanObliquity(Date(t))
 }
+
+// TT returns the Julian ephemeris day, on Terrestrial Time, of the UTC instant
+// t. The ephemerides take this, not the UT Julian day (issue 45).
+func TT(t time.Time) float64 {
+	return ephemeris.TimeToJDE(t)
+}
+
+// FromTT returns the UTC instant of a Julian ephemeris day. It is the inverse
+// of TT, for turning an event the ephemerides place in TT back into UTC.
+func FromTT(jde float64) time.Time {
+	return ephemeris.JDEToTime(jde)
+}
+
+// ApparentSiderealTime returns the Greenwich apparent sidereal time for the
+// given instant, in degrees in [0, 360): mean sidereal time plus the nutation
+// in right ascension. It is the sidereal time that matches positions referred
+// to the true equator and equinox of date. UT1 is taken as UTC, which it
+// tracks to within 0.9 s.
+func ApparentSiderealTime(t time.Time) float64 {
+	return angles.Normalize(GreenwichSiderealTime(t) + ephemeris.NutationInRA(TT(t)))
+}

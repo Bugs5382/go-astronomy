@@ -16,7 +16,7 @@ sidebar_position: 1
 - 🌍 **Universal Sun plus per-body traits.** Only the Sun is universal to the solar system; each body package (currently `earth`, including `earth/moon`) owns that body's observer, atmosphere, and naming traits. Stars and constellations are universal catalogs.
 - 🧵 **Stateless and concurrency-safe.** `time.Time` is always a parameter, never captured at construction, so the same instance serves many callers at once. A service can compute a distinct sky per site visitor.
 - 📐 **Discs, not points.** Sun and Moon positions are the center of the disc, always paired with an angular diameter, so a consumer can size the disc and reason about alignment and overlap (eclipses, occultations) from the data alone.
-- 🎯 **Arcminute-class accuracy.** The math is an in-house implementation of Jean Meeus' *Astronomical Algorithms*, with no third-party ephemeris dependency. Each algorithm is anchored to a worked example from the book and measured against JPL Horizons. ΔT and leap seconds are deliberately omitted — they sit below that precision floor.
+- 🎯 **Arcminute-class accuracy.** The math is an in-house implementation of Jean Meeus' *Astronomical Algorithms*, with no third-party ephemeris dependency. Each algorithm is anchored to a worked example from the book and measured against JPL Horizons. Sun and Moon positions run on Terrestrial Time, with ΔT from the IERS leap-second table, and include nutation.
 
 ## 🧭 How the packages fit together
 

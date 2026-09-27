@@ -54,4 +54,4 @@ At high latitudes the Sun may not cross the horizon on a given day. That is an e
 
 ## 🎯 Accuracy
 
-The target is amateur, arcminute-class accuracy, using an in-house implementation of the Meeus algorithms. ΔT and leap seconds are deliberately omitted because they sit below that precision floor. Do not rely on the library for higher-precision ephemeris work.
+The target is amateur, arcminute-class accuracy, using an in-house implementation of the Meeus algorithms. The Sun and Moon are computed on Terrestrial Time, with ΔT taken from the IERS leap-second table, and include nutation and the observer's parallax; against JPL Horizons DE441 the Moon is good to about 10″ and the Sun to about 35″. Star positions still omit nutation and aberration. Do not rely on the library for higher-precision ephemeris work.
