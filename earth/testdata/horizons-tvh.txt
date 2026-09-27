@@ -1,0 +1,37 @@
+# Sunrise and sunset on the true visual horizon, from JPL Horizons.
+#
+# Source: JPL Horizons API (https://ssd.jpl.nasa.gov/api/horizons.api), ephemeris DE441,
+# fetched 2026-09-26. Target 10 (Sun), geodetic observer, APPARENT='REFRACTED',
+# R_T_S_ONLY='TVH' (rise and set of the upper limb on the true visual horizon, which
+# models the dip for the site's height and refraction), one-minute step, TIME_TYPE='UT'.
+# Horizons reports each event at the one-minute step where it falls, so the times carry
+# up to a minute of quantisation. Horizons accepts only a 1 to 9 minute step for
+# rise/set output. Each query differs only in SITE_COORD and the start and stop times;
+# the first query was:
+#   https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%2710%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-104.99%2C39.74%2C0.000%27&QUANTITIES=%274%27&ANG_FORMAT=%27DEG%27&APPARENT=%27REFRACTED%27&R_T_S_ONLY=%27TVH%27&TIME_TYPE=%27UT%27&TIME_DIGITS=%27SECONDS%27&START_TIME=%272027-03-20+07%3A00%27&STOP_TIME=%272027-03-21+07%3A00%27&STEP_SIZE=%271+m%27
+#
+# Rows: <site> <lat> <lng> <elevation_m> <event r|s> <utc>
+denver 39.74 -104.99 0 r 2027-03-20T13:04:00Z
+denver 39.74 -104.99 0 s 2027-03-21T01:12:00Z
+denver 39.74 -104.99 0 r 2027-06-21T11:33:00Z
+denver 39.74 -104.99 0 s 2027-06-22T02:32:00Z
+denver 39.74 -104.99 0 r 2027-12-21T14:18:00Z
+denver 39.74 -104.99 0 s 2027-12-21T23:39:00Z
+denver 39.74 -104.99 1609 r 2027-03-20T12:57:00Z
+denver 39.74 -104.99 1609 s 2027-03-21T01:19:00Z
+denver 39.74 -104.99 1609 r 2027-06-21T11:25:00Z
+denver 39.74 -104.99 1609 s 2027-06-22T02:40:00Z
+denver 39.74 -104.99 1609 r 2027-12-21T14:10:00Z
+denver 39.74 -104.99 1609 s 2027-12-21T23:47:00Z
+lapaz -16.5 -68.15 0 r 2027-03-20T10:37:00Z
+lapaz -16.5 -68.15 0 s 2027-03-20T22:44:00Z
+lapaz -16.5 -68.15 0 r 2027-06-21T11:01:00Z
+lapaz -16.5 -68.15 0 s 2027-06-21T22:09:00Z
+lapaz -16.5 -68.15 0 r 2027-12-21T09:58:00Z
+lapaz -16.5 -68.15 0 s 2027-12-21T23:05:00Z
+lapaz -16.5 -68.15 3640 r 2027-03-20T10:29:00Z
+lapaz -16.5 -68.15 3640 s 2027-03-20T22:52:00Z
+lapaz -16.5 -68.15 3640 r 2027-06-21T10:52:00Z
+lapaz -16.5 -68.15 3640 s 2027-06-21T22:18:00Z
+lapaz -16.5 -68.15 3640 r 2027-12-21T09:49:00Z
+lapaz -16.5 -68.15 3640 s 2027-12-21T23:14:00Z

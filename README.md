@@ -72,6 +72,62 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 - 🕛 **Seamless midnight rollover** — `earth.SegmentAt` answers "which band, and how far through it, at `now`" and stitches across midnight with no gap. Callers ask only for `now`, never for the previous or next day.
 - 🧵 **Stateless & concurrency-safe** — every call takes the observer and `time.Time`; nothing is captured at construction, so the same instance serves many visitors at once.
 
+## ⛰️ Observer height
+
+An `Observer`'s height above sea level is optional. From height the sea horizon lies below the astronomical horizon by the dip, so the Sun and Moon rise earlier and set later (7.3 minutes at Denver's 1609 m in June), and the height enters their parallax. There are three ways to give an observer its height.
+
+### Always sea level
+
+Leave `Height` out. The zero value is `astronomy.SeaLevel`, the answers are the sea-level answers, and nothing reaches the network.
+
+```go
+obs := astronomy.Observer{Lat: 40.71, Lng: -74.01, TZ: tz}
+```
+
+### By hand
+
+Set `Height` with `astronomy.Feet` or `astronomy.Meters` (1 ft = 0.3048 m exactly). Any real value is used as given, with no check against the terrain: below sea level (the Dead Sea shore is -430 m), a mountain, or a plane at cruising altitude. New York at 5000 ft is valid on purpose.
+
+```go
+obs := astronomy.Observer{Lat: 40.71, Lng: -74.01, TZ: tz, Height: astronomy.Feet(5000)} // same as Meters(1524)
+day, err := earth.NewSunTimes(obs, date) // sunrise 7.2 minutes earlier than at sea level
+```
+
+Only NaN and the infinities are invalid: every function that returns an error rejects them with `astronomy.ErrInvalidHeight` (code 7011), and `Height.Err()` checks one up front.
+
+### Lookup
+
+An `astronomy.ElevationResolver` finds the height at a coordinate. `Elevation(ctx, lat, lon)` returns `(Height, source, error)`, with the source `"caller"`, `"static"`, `"open-meteo"`, or `"sea-level"`. Every lookup failure falls back to sea level with the source `"sea-level"`; the error is only for a cancelled or expired context.
+
+```go
+// The Open-Meteo default: worldwide, free, no key.
+obs, source, err := openmeteo.ResolveObserver(ctx, 39.74, -104.99)
+
+// Or composed: a height you already have, then a fixed value, then Open-Meteo.
+resolver := astronomy.ChainElevation(
+	astronomy.CallerElevation(weatherHeight, haveWeatherHeight), // "caller"
+	astronomy.StaticElevation(astronomy.Meters(21)),             // "static"
+	openmeteo.New(openmeteo.WithHTTPClient(client)),             // "open-meteo"
+)
+obs, source, err = astronomy.ResolveObserverWith(ctx, resolver, lat, lon)
+```
+
+The `openmeteo` resolver respects `ctx`, bounds each lookup with a default 10 s timeout (`WithTimeout`), takes an injected `*http.Client` (`WithHTTPClient`), caches each 0.01° cell in process with no expiry (`WithRound`, `Cached`, `Store`), and logs through go-log: coordinates at debug, fallbacks at warn, nothing else about the caller. It lives in its own package, so a program that never imports it never links `net/http`.
+
+### Moving observers
+
+A caller in motion, such as a plane, passes the position and height for each instant to each time-based call. `Example_flightNYCToLondon` follows a JFK to Heathrow flight at 36000 ft: at 04:54 UTC over the Atlantic the Sun is up for the plane (-2.43°, above its dipped horizon of -3.91°) but not yet for the ocean below.
+
+```go
+for _, f := range []float64{0, 0.25, 0.5, 0.7, 0.75, 1} {
+	lat, lng := greatCircle(jfk, lhr, f) // the point f of the way along the route
+	obs := astronomy.Observer{Lat: lat, Lng: lng, Height: astronomy.Feet(36000)}
+	sun := earth.SunPosition(obs, depart.Add(time.Duration(f*float64(7*time.Hour))))
+	up := sun.Altitude > earth.HorizonAltitude-earth.HorizonDip(obs.Height)
+	_ = up
+}
+```
+
 ## 📋 Requirements
 
 - Go **`>= 1.27`**
