@@ -30,12 +30,21 @@ import (
 )
 
 // TestJuneSolsticeMeeusExample anchors the equinox and solstice series against
-// Meeus, Astronomical Algorithms, example 27.a: the June solstice of 1962 falls
-// at JDE 2437837.39245.
+// Meeus, Astronomical Algorithms, example 27.a: the series puts the June
+// solstice of 1962 at JDE 2437837.39245. The refinement on VSOP87 then moves it
+// by under a minute, onto the crossing itself.
 func TestJuneSolsticeMeeusExample(t *testing.T) {
 	t.Parallel()
-	if got := JuneSolstice(1962); math.Abs(got-2437837.39245) > 1e-5 {
-		t.Errorf("JuneSolstice(1962) = %.5f, want 2437837.39245", got)
+	series := seasonBoundary(1962, juneAncient, juneModern)
+	if math.Abs(series-2437837.39245) > 1e-5 {
+		t.Errorf("series JuneSolstice(1962) = %.5f, want 2437837.39245", series)
+	}
+	if got := JuneSolstice(1962); math.Abs(got-series) > 1.0/1440 {
+		t.Errorf("refined JuneSolstice(1962) = %.5f, more than a minute from the series", got)
+	}
+	lon, _, _ := SunApparentEcliptic(JuneSolstice(1962))
+	if d := math.Abs(lon - 90); d > 0.01/arcsecPerDeg {
+		t.Errorf("apparent longitude at the refined solstice = %.7f, want 90", lon)
 	}
 }
 
@@ -100,13 +109,14 @@ var ephemerisSeasonBoundaries = []struct {
 // TestSeasonBoundariesAgainstEphemeris measures the season boundaries against a
 // modern numerical ephemeris.
 //
-// The series returns dynamical time, which JDEToTime converts to UTC with the
-// leap-second table (issue 45). What remains is the abridged chapter 27 series,
-// which Meeus gives as good to within one minute for the years 1951 to 2050.
-// The observed error is under 28 s, and the tolerance is 45 s.
+// The instants are refined on the VSOP87 Sun and converted from dynamical
+// time to UTC with the leap-second table (issue 45). The Sun moves an arc
+// second in about 24 s, so its 0.14 arc second error against DE441 is worth
+// about 3 s here, and the fixtures are interpolated from half-hour steps. The
+// observed error is 3.1 s at most, and the tolerance is 5 s.
 func TestSeasonBoundariesAgainstEphemeris(t *testing.T) {
 	t.Parallel()
-	const tol = 45 * time.Second
+	const tol = 5 * time.Second
 	for _, c := range ephemerisSeasonBoundaries {
 		got := JDEToTime(c.fn(c.year))
 		if d := got.Sub(c.utc); d > tol || d < -tol {

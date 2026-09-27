@@ -44,7 +44,8 @@ const deg2rad = math.Pi / 180
 // itself, the Meeus worked examples in internal/julian and internal/coordinates.
 // The values were re-pinned when the Sun moved to Terrestrial Time with full
 // nutation, apparent sidereal time, and the observer's parallax (issue 45),
-// which moved them by up to about 30 arc seconds.
+// which moved them by up to about 30 arc seconds, and again when the solar
+// theory moved to VSOP87, which moved them by up to about 10 arc seconds.
 var sunPinned = []struct {
 	observer string
 	when     string
@@ -52,22 +53,22 @@ var sunPinned = []struct {
 	az       float64
 	diameter float64
 }{
-	{"brooklyn", "1982-05-03T16:00:00Z", 62.542139146357, 151.620444869998, 0.528783339677},
-	{"brooklyn", "1992-10-13T00:00:00Z", -19.810400518585, 276.875660053559, 0.534377283019},
-	{"brooklyn", "2026-09-04T12:30:00Z", 22.567878708308, 100.471557222931, 0.528637996201},
-	{"brooklyn", "2026-12-21T17:00:00Z", 25.866776887926, 181.542482917223, 0.541931980677},
-	{"quito", "1982-05-03T16:00:00Z", 66.391661824752, 46.900158694908, 0.528783339677},
-	{"quito", "1992-10-13T00:00:00Z", -14.792430086841, 261.898008643446, 0.534377283019},
-	{"quito", "2026-09-04T12:30:00Z", 19.097444602063, 82.464132335081, 0.528637996201},
-	{"quito", "2026-12-21T17:00:00Z", 66.559034686452, 173.041071905117, 0.541931980677},
-	{"tromso", "1982-05-03T16:00:00Z", 18.265947243487, 265.977902745586, 0.528783339677},
-	{"tromso", "1992-10-13T00:00:00Z", -26.464868645697, 24.921864971179, 0.534377283019},
-	{"tromso", "2026-09-04T12:30:00Z", 25.057269765383, 209.486547100518, 0.528637996201},
-	{"tromso", "2026-12-21T17:00:00Z", -23.422257531215, 265.490406806010, 0.541931980677},
-	{"auckland", "1982-05-03T16:00:00Z", -36.739633037140, 97.885137418587, 0.528783339677},
-	{"auckland", "1992-10-13T00:00:00Z", 60.888809127293, 3.693109121592, 0.534377283019},
-	{"auckland", "2026-09-04T12:30:00Z", -60.124398833118, 175.002148144185, 0.528637996201},
-	{"auckland", "2026-12-21T17:00:00Z", -0.571410846819, 120.299083825353, 0.541931980677},
+	{"brooklyn", "1982-05-03T16:00:00Z", 62.542321469376, 151.623185947405, 0.528797984926},
+	{"brooklyn", "1992-10-13T00:00:00Z", -19.811420543502, 276.878220435616, 0.534405942064},
+	{"brooklyn", "2026-09-04T12:30:00Z", 22.569034617598, 100.471780730241, 0.528647877561},
+	{"brooklyn", "2026-12-21T17:00:00Z", 25.866979105624, 181.543856793914, 0.541938252649},
+	{"quito", "1982-05-03T16:00:00Z", 66.392800707931, 46.898716502804, 0.528797984926},
+	{"quito", "1992-10-13T00:00:00Z", -14.794815212325, 261.899119997438, 0.534405942064},
+	{"quito", "2026-09-04T12:30:00Z", 19.098420197739, 82.463440868277, 0.528647877561},
+	{"quito", "2026-12-21T17:00:00Z", 66.559424961010, 173.044064201396, 0.541938252649},
+	{"tromso", "1982-05-03T16:00:00Z", 18.265216533379, 265.979005577795, 0.528797984926},
+	{"tromso", "1992-10-13T00:00:00Z", -26.463367755099, 24.924258087123, 0.534405942064},
+	{"tromso", "2026-09-04T12:30:00Z", 25.057694890790, 209.487755378282, 0.528647877561},
+	{"tromso", "2026-12-21T17:00:00Z", -23.422510179949, 265.491743858510, 0.541938252649},
+	{"auckland", "1982-05-03T16:00:00Z", -36.738439352882, 97.884571773758, 0.528797984926},
+	{"auckland", "1992-10-13T00:00:00Z", 60.887764663045, 3.688179199708, 0.534405942064},
+	{"auckland", "2026-09-04T12:30:00Z", -60.124934317185, 175.000050299962, 0.528647877561},
+	{"auckland", "2026-12-21T17:00:00Z", -0.570634711357, 120.298100582586, 0.541938252649},
 }
 
 // namedObservers resolves the observer fixtures used by the pinned tables.
@@ -157,15 +158,16 @@ func horizontalFromEquatorial(raDeg, decDeg, gstDeg, latDeg, lngEastDeg float64)
 // this library's own, itself anchored to Meeus examples 12.a and 12.b in
 // internal/julian.
 //
-// The tolerance is 0.02 degrees, about 72 arc seconds. That is the error budget
-// of the low-accuracy solar series of Meeus chapter 25 (roughly 0.01 degrees in
-// longitude) plus the deliberate omission of Delta-T, which shifts the Sun by
-// about 0.0007 degrees per minute of clock difference. Both are documented
-// limits of this library, not defects, and both are far below its stated
-// arcminute-class accuracy.
+// The Horizons places are geocentric and the reference conversion uses mean
+// sidereal time, while SunPosition is topocentric (solar parallax, up to 8.8
+// arc seconds) and uses apparent sidereal time (the nutation in right
+// ascension, up to about 17 arc seconds). Those two account for the observed
+// worst of 0.0064 degrees in altitude and 0.0087 in azimuth, so the tolerances
+// are 0.01 and 0.02 degrees. The solar theory itself is measured to 0.5 arc
+// seconds in internal/ephemeris.
 func TestSunPositionAgainstEphemeris(t *testing.T) {
 	t.Parallel()
-	const tol = 0.02
+	const tol = 0.01
 	observers := []astronomy.Observer{brooklyn, quito, tromso, auckland}
 	for _, e := range ephemerisSun {
 		when := mustParse(t, e.when)
@@ -184,7 +186,7 @@ func TestSunPositionAgainstEphemeris(t *testing.T) {
 				if d > 180 {
 					d = 360 - d
 				}
-				if d > 0.1 {
+				if d > 0.02 {
 					t.Errorf("%v %s azimuth = %.6f, ephemeris %.6f", obs, e.when, pos.Azimuth, wantAz)
 				}
 			}

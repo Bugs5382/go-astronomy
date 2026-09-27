@@ -39,13 +39,13 @@ import (
 )
 
 // Tolerances for the Sun and Moon against JPL Horizons DE441 (issue 45). The
-// Moon's truncated chapter 47 series is good to about 10 arc seconds; the Sun
-// still runs on the low-accuracy chapter 25 theory, good to about 34 arc
-// seconds geocentric, which dominates the eclipse timing.
+// Moon's truncated chapter 47 series is good to about 10 arc seconds, and it
+// now sets the eclipse timing: the Sun runs on VSOP87 and is observed within
+// 1.4 arc seconds here. The closest approach is observed within 10 s.
 const (
 	moonToleranceArcsec = 15
-	sunToleranceArcsec  = 45
-	closestApproachTol  = 75 * time.Second
+	sunToleranceArcsec  = 5
+	closestApproachTol  = 20 * time.Second
 )
 
 // eclipseRow is one ten-second sample of a committed Horizons eclipse fixture.
