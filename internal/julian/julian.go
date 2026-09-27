@@ -89,3 +89,9 @@ func FromTT(jde float64) time.Time {
 func ApparentSiderealTime(t time.Time) float64 {
 	return angles.Normalize(GreenwichSiderealTime(t) + ephemeris.NutationInRA(TT(t)))
 }
+
+// ApparentSiderealTimeNutated is ApparentSiderealTime with the nutation at
+// TT(t) already evaluated. It gives exactly ApparentSiderealTime's result.
+func ApparentSiderealTimeNutated(t time.Time, n ephemeris.Nutated) float64 {
+	return angles.Normalize(GreenwichSiderealTime(t) + n.InRA())
+}

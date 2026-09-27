@@ -81,6 +81,10 @@ const (
 	// CodeInvalidPassWindow marks a pass search whose end is not after its
 	// start, or which spans more than 31 days.
 	CodeInvalidPassWindow = 7016
+	// CodeInvalidAtmosphere marks measured air for the refraction model whose
+	// pressure is not a positive finite number or whose temperature is not
+	// finite or at or below -273 C.
+	CodeInvalidAtmosphere = 7017
 	// CodeUnknownBody marks a sky Site or target with no body, a Site on the
 	// Sun, or a planet with no IAU rotation model.
 	CodeUnknownBody = 7018
@@ -105,6 +109,7 @@ var errorEntries = []apperr.Entry{
 	{Code: CodeInvalidElements, Title: "satellite", Cause: "satellite element set could not be parsed"},
 	{Code: CodeSatellitePropagation, Title: "satellite", Cause: "SGP4 could not propagate the element set to the instant"},
 	{Code: CodeInvalidPassWindow, Title: "satellite", Cause: "pass window end not after start, or longer than 31 days"},
+	{Code: CodeInvalidAtmosphere, Title: "atmosphere", Cause: "measured atmosphere pressure or temperature not physical"},
 	{Code: CodeUnknownBody, Title: "sky", Cause: "site or target has no body, the site is on the Sun, or the planet has no rotation model"},
 	{Code: CodeSameBody, Title: "sky", Cause: "target is the body the site stands on"},
 }

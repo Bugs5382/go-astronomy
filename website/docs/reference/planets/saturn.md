@@ -30,7 +30,7 @@ func NextTransit(obs astronomy.Observer, t time.Time) (time.Time, bool, error)
 
 - `Position` returns a [`planet.Result`](../planet.md#result): topocentric geometric altitude and azimuth with the apparent diameter, the apparent RA and Dec of date, distance and light-time, magnitude, phase angle, illuminated fraction, elongation, and the `NearSun` flag. A negative altitude is below the horizon and is a valid answer.
 - `Heliocentric` is Saturn seen from the Sun's centre, on the ecliptic and equinox of date; it belongs to no observer. Difference it with `planet.EarthHeliocentric` for the geometric view from Earth.
-- `NextRise` and `NextSet` are the centre crossing `planet.HorizonAltitude` (−0.5667°, standard refraction), lowered by the horizon dip for the observer's `Height` (see [Observer and height](../observer.md)). `NextTransit` is the upper culmination, whether or not Saturn is up. Each reports `false` when nothing happens within 30 days.
+- `NextRise` and `NextSet` are the centre crossing `planet.HorizonAltitude` (−0.5667°, standard refraction, scaled by the air at the observer's height), lowered by the horizon dip for the observer's `Height` (see [Observer and height](../observer.md)). `NextTransit` is the upper culmination, whether or not Saturn is up. Each reports `false` when nothing happens within 30 days.
 - `NearSun` is set when the elongation is under 11°. That is a heuristic, so the elongation and the magnitude are always reported too.
 - The observer's `Height` also enters the parallax, where it moves a planet by far less than 0.1″.
 - Errors are go-apperr coded: `planet.ErrInvalidLatitude` and `planet.ErrInvalidLongitude` for an out-of-range observer, and `astronomy.ErrInvalidHeight` for a NaN or infinite height.

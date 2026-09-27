@@ -26,5 +26,7 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 // HorizonAltitude is the geometric altitude of a planet's centre, in degrees,
 // when it sits on the horizon under standard refraction (34 arc minutes). The
 // discs are arc seconds across, so the centre stands in for the planet in
-// NextRise and NextSet.
+// NextRise and NextSet. It is the sea-level value: for an observer above sea
+// level NextRise and NextSet scale it by earth.StandardAtmosphere.Factor and
+// lower it by earth.HorizonDip.
 const HorizonAltitude = -0.5667

@@ -90,6 +90,31 @@ func Nutation(jde float64) (dpsi, deps float64) {
 	return sumPsi * 1e-4 / arcsecPerDeg, sumEps * 1e-4 / arcsecPerDeg
 }
 
+// Nutated is the nutation and the obliquity of the ecliptic at one instant.
+// The 63-term nutation series is most of the cost of an apparent place, and a
+// Sun position needs it three times (the apparent longitude, the true
+// obliquity, and the apparent sidereal time); NutationAt evaluates it once for
+// all of them. Every method gives exactly the value of the function it stands
+// for.
+type Nutated struct {
+	// DPsi and DEps are the nutation in longitude and in obliquity, and
+	// MeanEps the mean obliquity, all in degrees.
+	DPsi, DEps, MeanEps float64
+}
+
+// NutationAt returns the nutation and the mean obliquity at the Julian
+// ephemeris day jde.
+func NutationAt(jde float64) Nutated {
+	dpsi, deps := Nutation(jde)
+	return Nutated{DPsi: dpsi, DEps: deps, MeanEps: MeanObliquity(jde)}
+}
+
+// TrueObliquity is TrueObliquity(jde) for the instant of n.
+func (n Nutated) TrueObliquity() float64 { return n.MeanEps + n.DEps }
+
+// InRA is NutationInRA(jde) for the instant of n.
+func (n Nutated) InRA() float64 { return n.DPsi * math.Cos(radians(n.MeanEps+n.DEps)) }
+
 // MeanObliquity returns the mean obliquity of the ecliptic, in degrees, at the
 // given Julian ephemeris day, by the IAU 1980 polynomial (Meeus 22.2).
 //
