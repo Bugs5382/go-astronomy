@@ -32,6 +32,7 @@ Module path: `github.com/Bugs5382/go-astronomy`
 | `github.com/Bugs5382/go-astronomy/constellation` | universal (roadmap) | Boundary lookup by RA/Dec; IAU dataset is the overridable default. |
 | `github.com/Bugs5382/go-astronomy/earth` | Earth traits (roadmap) | `earth.SunPosition(obs, t)`, `earth.SunTrack(obs, date, samples)` (disc-center alt/az plus apparent diameter), `earth.NewSunTimes(obs, date)`, twilight bands, `earth.DefaultSegmentation`, `earth.Refraction`, polar states. |
 | `github.com/Bugs5382/go-astronomy/earth/moon` | Earth traits (roadmap) | Luna: `Position`/`ApparentPosition`, `NextRise`/`NextSet`, phases (`Age`, `Illumination`, `PhaseAngle`, next new/full), `Track`. |
+| `github.com/Bugs5382/go-astronomy/planet` | universal | Mercury to Neptune: `Position(obs, body, t)` (topocentric apparent place, diameter, phase, magnitude, elongation, `NearSun`), `NextRise`/`NextSet`/`NextTransit`, and `Heliocentric(body, t)` (observer-independent, Earth included). Carries its own generated VSOP87 tables. |
 | `github.com/Bugs5382/go-astronomy/internal/...` | internal | Math core (`angles`, `julian`, `coordinates`, `ephemeris`, `project`). Unexported by policy — do not import. |
 
 Only the Sun is universal to the solar system. Moons are body-specific (Luna
