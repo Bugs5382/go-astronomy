@@ -61,6 +61,19 @@ func ExampleHeliocentric() {
 	// L 128.8690 B 1.8161 R 1.646686 au
 }
 
+// The Mars clock: the Mars Sol Date, and the local mean solar time at Jezero
+// crater (77.45 E) at the same instant.
+func ExampleSolDate() {
+	when := time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)
+	fmt.Printf("Mars Sol Date %.4f\n", mars.SolDate(when))
+	fmt.Printf("Jezero %.2f Mars hours\n", mars.LocalMeanSolarTime(when, 77.45))
+	fmt.Println("a sol is", mars.Sol)
+	// Output:
+	// Mars Sol Date 54389.2688
+	// Jezero 11.62 Mars hours
+	// a sol is 24h39m35.244147s
+}
+
 // Mars's rise, transit, and set at Greenwich from 1 September 2027.
 func ExampleNextRise() {
 	greenwich := astronomy.Observer{Lat: 51.4769, Lng: -0.0005, TZ: time.UTC}

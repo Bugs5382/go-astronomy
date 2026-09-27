@@ -85,6 +85,11 @@ const (
 	// pressure is not a positive finite number or whose temperature is not
 	// finite or at or below -273 C.
 	CodeInvalidAtmosphere = 7017
+	// CodeUnknownBody marks a sky Site or target with no body, a Site on the
+	// Sun, or a planet with no IAU rotation model.
+	CodeUnknownBody = 7018
+	// CodeSameBody marks a sky target that is the body the site stands on.
+	CodeSameBody = 7019
 )
 
 // errorEntries is the module's code table. It feeds the go-apperr registry that
@@ -105,6 +110,8 @@ var errorEntries = []apperr.Entry{
 	{Code: CodeSatellitePropagation, Title: "satellite", Cause: "SGP4 could not propagate the element set to the instant"},
 	{Code: CodeInvalidPassWindow, Title: "satellite", Cause: "pass window end not after start, or longer than 31 days"},
 	{Code: CodeInvalidAtmosphere, Title: "atmosphere", Cause: "measured atmosphere pressure or temperature not physical"},
+	{Code: CodeUnknownBody, Title: "sky", Cause: "site or target has no body, the site is on the Sun, or the planet has no rotation model"},
+	{Code: CodeSameBody, Title: "sky", Cause: "target is the body the site stands on"},
 }
 
 // logSink adapts a go-log Logger to the go-apperr Logger interface. It is the
