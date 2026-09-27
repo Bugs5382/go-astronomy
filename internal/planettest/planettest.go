@@ -331,3 +331,48 @@ func CheckIsolated(t *testing.T, name string) {
 		}
 	}
 }
+
+// CheckHeight checks the observer's height: an omitted height gives exactly
+// the answers of an explicit zero, NaN and infinity are rejected with
+// astronomy.ErrInvalidHeight, and a height lowers the horizon by the dip, so
+// the planet rises earlier and sets later, by the dip's worth of motion.
+func CheckHeight(t *testing.T, b planet.Body) {
+	t.Helper()
+	when := time.Date(2027, 5, 1, 0, 0, 0, 0, time.UTC)
+	omitted := astronomy.Observer{Lat: 39.74, Lng: -104.99}
+	zero := omitted
+	zero.Height = astronomy.Meters(0)
+	a, errA := b.Position(omitted, when)
+	z, errZ := b.Position(zero, when)
+	if errA != nil || errZ != nil || a != z {
+		t.Errorf("omitted height %+v, explicit zero %+v", a, z)
+	}
+	for _, h := range []float64{math.NaN(), math.Inf(1), math.Inf(-1)} {
+		bad := omitted
+		bad.Height = astronomy.Meters(h)
+		if _, err := b.Position(bad, when); !errors.Is(err, astronomy.ErrInvalidHeight) {
+			t.Errorf("Position with height %v: %v", h, err)
+		}
+		if _, _, err := b.NextRise(bad, when); !errors.Is(err, astronomy.ErrInvalidHeight) {
+			t.Errorf("NextRise with height %v: %v", h, err)
+		}
+	}
+	high := omitted
+	high.Height = astronomy.Feet(5000)
+	r0, _, _ := b.NextRise(omitted, when)
+	r1, _, _ := b.NextRise(high, r0.Add(-time.Hour))
+	s0, _, _ := b.NextSet(omitted, when)
+	s1, _, _ := b.NextSet(high, s0.Add(-time.Hour))
+	// The dip at 1524 m is 1.145 degrees; at Denver's latitude a planet climbs
+	// through the horizon at 7 to 13 degrees an hour, so 5 to 10 minutes.
+	for name, d := range map[string]time.Duration{"rise earlier": r0.Sub(r1), "set later": s1.Sub(s0)} {
+		if d < 4*time.Minute || d > 12*time.Minute {
+			t.Errorf("5000 ft moved the %s by %v, want 4 to 12 minutes", name, d)
+		}
+	}
+	p0, _ := b.Position(omitted, when)
+	p1, _ := b.Position(high, when)
+	if d := sepArcsec(p0.RA, p0.Dec, p1.RA, p1.Dec); d > 0.1 {
+		t.Errorf("the height moved the place by %.3f arcsec, want well under 0.1", d)
+	}
+}

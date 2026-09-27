@@ -154,7 +154,7 @@ The angle points at the Sun even below the horizon, because both bodies use thei
 
 ## ⛰️ Observer height
 
-An `Observer`'s height above sea level is optional. From height the sea horizon lies below the astronomical horizon by the dip, so the Sun and Moon rise earlier and set later (7.3 minutes at Denver's 1609 m in June), and the height enters their parallax. There are three ways to give an observer its height.
+An `Observer`'s height above sea level is optional. From height the sea horizon lies below the astronomical horizon by the dip, so the Sun, the Moon, and the planets rise earlier and set later (7.3 minutes at Denver's 1609 m in June), and the height enters their parallax. There are three ways to give an observer its height.
 
 ### Always sea level
 
