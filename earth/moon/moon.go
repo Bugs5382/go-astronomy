@@ -17,7 +17,9 @@
 // diameter is measured from that same observer; ApparentPosition adds
 // atmospheric refraction. The package is stateless and concurrency-safe: time is
 // always a parameter, never captured. Positions are computed on Terrestrial
-// Time, with nutation, and are good to about ten arc seconds.
+// Time from the ELP 2000-82B lunar theory, with nutation, and match JPL DE441
+// to about half an arc second geocentric and 1.5 arc seconds as the observer
+// sees it.
 package moon
 
 /*
@@ -109,7 +111,12 @@ func validateObserver(obs astronomy.Observer) error {
 // the same observer-to-Moon distance, so the disc size and the altitude
 // describe one Moon from one vantage point (issue 44).
 func topocentric(obs astronomy.Observer, t time.Time) (coordinates.Horizontal, float64) {
-	ra, dec, topoDist, gst := topocentricEquatorial(obs, t)
+	return horizontal(obs, t, moonPlaceAt(t))
+}
+
+// horizontal is topocentric for a place already computed.
+func horizontal(obs astronomy.Observer, t time.Time, p moonPlace) (coordinates.Horizontal, float64) {
+	ra, dec, topoDist, gst := observe(obs, t, p)
 	hz := coordinates.EquatorialToHorizontal(
 		coordinates.Equatorial{RA: ra, Dec: dec}, obs.Lat, obs.Lng, gst)
 
@@ -121,6 +128,20 @@ func topocentric(obs astronomy.Observer, t time.Time) (coordinates.Horizontal, f
 // ascension and declination in degrees, its distance from the observer in km,
 // and the Greenwich apparent sidereal time in degrees, at t.
 func topocentricEquatorial(obs astronomy.Observer, t time.Time) (raDeg, decDeg, distKm, gstDeg float64) {
+	return observe(obs, t, moonPlaceAt(t))
+}
+
+// moonPlace is the Moon's apparent geocentric place at one instant: right
+// ascension and declination on the true equator and equinox of date, in
+// degrees, distance in km, and the nutation in right ascension (the equation
+// of the equinoxes) in degrees. It is everything about the Moon that does not
+// depend on the observer.
+type moonPlace struct {
+	ra, dec, distKm, eqEquinoxes float64
+}
+
+// moonPlaceAt computes the Moon's place at t.
+func moonPlaceAt(t time.Time) moonPlace {
 	// The lunar theory runs on Terrestrial Time and gives the mean equinox of
 	// date; nutation moves it to the true equinox the Sun uses, and apparent
 	// sidereal time matches that frame (issue 45).
@@ -129,9 +150,15 @@ func topocentricEquatorial(obs astronomy.Observer, t time.Time) (raDeg, decDeg, 
 	dpsi, deps := ephemeris.Nutation(jde)
 	eq := coordinates.EclipticToEquatorial(
 		coordinates.Ecliptic{Lon: lam + dpsi, Lat: bet}, ephemeris.MeanObliquity(jde)+deps)
-	gstDeg = julian.ApparentSiderealTime(t)
+	return moonPlace{ra: eq.RA, dec: eq.Dec, distKm: dist, eqEquinoxes: ephemeris.NutationInRA(jde)}
+}
 
-	raDeg, decDeg, distKm = ephemeris.Topocentric(eq.RA, eq.Dec, dist, obs.Lat, obs.Height.Meters(), gstDeg+obs.Lng)
+// observe moves the Moon's place to the observer at t: the apparent sidereal
+// time, then the rigorous parallax from the Earth's centre to the observer on
+// the WGS84 ellipsoid.
+func observe(obs astronomy.Observer, t time.Time, p moonPlace) (raDeg, decDeg, distKm, gstDeg float64) {
+	gstDeg = angles.Normalize(julian.GreenwichSiderealTime(t) + p.eqEquinoxes)
+	raDeg, decDeg, distKm = ephemeris.Topocentric(p.ra, p.dec, p.distKm, obs.Lat, obs.Height.Meters(), gstDeg+obs.Lng)
 	return raDeg, decDeg, distKm, gstDeg
 }
 

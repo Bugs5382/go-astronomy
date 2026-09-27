@@ -36,7 +36,11 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 // and then verified term by term against a second, independently written
 // rendering of the book (PyMeeus) before use.
 
-import "math"
+import (
+	"math"
+
+	"github.com/Bugs5382/go-astronomy/internal/elp"
+)
 
 // earthEquatorialRadiusKm is the Earth's equatorial radius, the baseline of the
 // Moon's equatorial horizontal parallax (Meeus, p. 337).
@@ -70,12 +74,29 @@ func moonArguments(t float64) (d, m, mp, f float64) {
 // MoonPosition returns the Moon's geocentric ecliptic longitude in degrees in
 // [0, 360), its geocentric ecliptic latitude in degrees, and the distance
 // between the centres of the Earth and the Moon in kilometres, at the given
+// Julian ephemeris day, from the ELP 2000-82B theory truncated to about a
+// thousand terms (package elp): within about half an arc second of JPL DE441
+// over the present era, where the chapter 47 abridgement, MoonPositionMeeus,
+// is good to about 10 (issue 37).
+//
+// The longitude and latitude are referred to the mean equinox and ecliptic of
+// date and do not include nutation. A caller wanting the apparent position
+// adds the nutation in longitude; see Nutation.
+func MoonPosition(jde float64) (lonDeg, latDeg, distanceKm float64) {
+	return elp.Position(jde)
+}
+
+// MoonPositionMeeus returns the Moon's geocentric ecliptic longitude in degrees in
+// [0, 360), its geocentric ecliptic latitude in degrees, and the distance
+// between the centres of the Earth and the Moon in kilometres, at the given
 // Julian ephemeris day.
 //
 // The longitude and latitude are referred to the mean equinox of date and do
 // not include nutation. A caller wanting the apparent position adds the
 // nutation in longitude; see Nutation.
-func MoonPosition(jde float64) (lonDeg, latDeg, distanceKm float64) {
+//
+// It is the chapter 47 series, kept as the book's reference for the tests.
+func MoonPositionMeeus(jde float64) (lonDeg, latDeg, distanceKm float64) {
 	t := J2000Century(jde)
 	// Mean longitude of the Moon (47.1).
 	lprime := Horner(t, 218.3164477, 481267.88123421, -0.0015786, 1.0/538841, -1.0/65194000)
