@@ -73,6 +73,49 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 - 🕛 **Seamless midnight rollover** — `earth.SegmentAt` answers "which band, and how far through it, at `now`" and stitches across midnight with no gap. Callers ask only for `now`, never for the previous or next day.
 - 🧵 **Stateless & concurrency-safe** — every call takes the observer and `time.Time`; nothing is captured at construction, so the same instance serves many visitors at once.
 
+## 🪐 Planets
+
+The `planet` package places Mercury, Venus, Mars, Jupiter, Saturn, Uranus, and Neptune in an observer's sky, in the same shape as the Moon, and publishes each planet's heliocentric position. Positions come from VSOP87 tables generated into the package, so a program that never imports `planet` never links them.
+
+### Position, brightness, and phase
+
+```go
+greenwich := astronomy.Observer{Lat: 51.4769, Lng: -0.0005, TZ: time.UTC}
+when := time.Date(2027, 2, 19, 22, 0, 0, 0, time.UTC) // Mars near opposition
+
+r, err := planet.Position(greenwich, planet.Mars, when)
+if err != nil {
+	panic(err)
+}
+fmt.Printf("alt %.2f az %.2f\n", r.Altitude, r.Azimuth)                 // alt 44.53 az 129.60
+fmt.Printf("%.2f arcsec, mag %.2f\n", float64(r.Diameter)*3600, r.Magnitude) // 13.82 arcsec, mag -1.28
+fmt.Printf("%.1f%% lit, light-time %v\n", 100*r.Illuminated, r.LightTime.Round(time.Second)) // 99.9% lit, light-time 5m38s
+```
+
+`Result` embeds `astronomy.Position` (topocentric geometric altitude and azimuth, and the apparent diameter from the same distance) and adds the topocentric apparent RA/Dec of date, distance in au, light-time, magnitude, phase angle, illuminated fraction, elongation from the Sun, and a `NearSun` flag. Magnitudes follow Mallama and Hilton (2018), the Astronomical Almanac formulas, with Saturn's rings from their tilt.
+
+### Rise, set, and transit
+
+```go
+rise, ok, err := planet.NextRise(greenwich, planet.Jupiter, time.Date(2027, 9, 1, 0, 0, 0, 0, time.UTC))
+transit, _, _ := planet.NextTransit(greenwich, planet.Jupiter, rise)
+set, _, _ := planet.NextSet(greenwich, planet.Jupiter, transit)
+// 05:06:53, 11:58:08, 18:49:07 UTC; ok is false when nothing happens within 30 days
+```
+
+### Heliocentric positions
+
+```go
+h, err := planet.Heliocentric(planet.Jupiter, when) // ecliptic of date: L, B in degrees, R in au
+v := h.Vector()                                     // rectangular, au
+```
+
+`Heliocentric` accepts `planet.Earth`, so the geometric view of one planet from another is the difference of two vectors.
+
+### Accuracy
+
+Against JPL Horizons DE441 (2020 to 2030, plus two conjunctions), the apparent place is within 0.3″ for Mercury, Venus, and Mars, 0.6″ for Jupiter and Saturn, and 1.7″ for Uranus and Neptune. Magnitudes agree to 0.08, and rise, set, and transit fall within Horizons' one-minute step. The VSOP87 coverage, frames, units, and sources are on the [planet reference page](./website/docs/reference/planet.md).
+
 ## 📋 Requirements
 
 - Go **`>= 1.27`**
