@@ -10,7 +10,7 @@ sidebar_position: 3
 
 The library separates what is universal to the solar system from what belongs to a specific vantage body.
 
-- **Universal** packages describe the sky itself. `sun` holds the Sun's apparent angular size versus distance — the only observer-independent part of the Sun. `star` holds an embedded catalog of stars with their equatorial coordinates and distance. `constellation` identifies which IAU figure a point on the sky falls in. None of these know about the Earth.
+- **Universal** packages describe the sky itself. `sun` holds the Sun's apparent angular size versus distance — the only observer-independent part of the Sun. `star` holds an embedded catalog of stars with their equatorial coordinates and distance. `constellation` identifies which IAU figure a point on the sky falls in. each `planet/<name>` package publishes its planet's heliocentric position, which belongs to no observer, alongside the Earth-observer view of it. None of these know about an observer's horizon until asked.
 - **Per-body** packages add the traits of one vantage. `earth` turns the universal Sun into an Earth observer's alt/az, twilight bands, refraction, polar states, and seasons. `earth/moon` is Luna, which belongs to Earth (another body would own its own moons).
 
 This is why the alt/az of the Sun lives in `earth.SunPosition` and not in `sun`: altitude, azimuth, sidereal time, and the Earth-Sun distance are all Earth-specific. Adding a future body (for example `mars/`) would reuse `sun`, `star`, and `constellation` unchanged.
@@ -51,6 +51,10 @@ Pass a zone-aware `time.Time` on every call. The library computes internally in 
 ## ❄️ Polar states
 
 At high latitudes the Sun may not cross the horizon on a given day. That is an explicit state, never a nil panic or a `-1` sentinel. `SunTimes.Polar()` returns a `PolarState` of `MidnightSun` (Sun up all day) or `PolarNight` (Sun down all day) with a boolean that is false on an ordinary day. Absence in general is explicit throughout the API: `(value, bool)` or `(value, error)` where a result may not exist, for example no sunrise during a polar day.
+
+## 🪐 Heliocentric first, then an observer
+
+A planet's position is computed in two steps, and the first is published on its own. Each planet package's `Heliocentric` (for example `mars.Heliocentric`) gives the planet seen from the Sun's centre, a vector that does not depend on anyone; its `Position` then reduces it to one observer on Earth, with light-time, aberration, nutation, and the topocentric correction. Keeping the first step public is what lets an observer on another body be built later: Earth seen from Mars is the difference of two heliocentric vectors, just as Mars seen from Earth is.
 
 ## ⛰️ Height and the horizon
 

@@ -11,7 +11,7 @@
 
 It is designed for a service that computes a distinct sky per site visitor, so the API is **stateless, deterministic, and concurrency-safe**: `time.Time` is always a parameter, never captured at construction. The math is an in-house implementation of Jean Meeus' *Astronomical Algorithms* with no third-party ephemeris dependency (arcminute-class accuracy).
 
-> **Status:** v1.0.0. Everything below ships, and every signature shown matches `go doc`. One item is marked **(roadmap)** where it appears: blue-moon detection. Planets are out of scope for this release.
+> **Status:** v1.0.0. Everything below ships, and every signature shown matches `go doc`. One item is marked **(roadmap)** where it appears: blue-moon detection.
 
 ## 🚀 Quick start
 
@@ -64,6 +64,7 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 - 🌅 **Earth vantage on the Sun** — `earth.SunPosition` (geometric alt/az of the disc center, paired with apparent diameter) and `earth.SunTrack` (arc samples of `{Time, Altitude, Azimuth, TimeProgress}`). The alt/az, sidereal time, and Earth-Sun distance are all Earth-specific, so they live with the Earth vantage rather than in `sun`.
 - 🌇 **Earth twilight bands** — `earth.NewSunTimes` resolves one civil day in the observer's timezone with Earth refraction (−0.833° upper limb, Bennett): astronomical/nautical/civil dawn, sunrise, golden hour, day split at solar noon, golden hour, sunset, and the matching dusk bands. Each band is `{from, to, seconds}`.
 - 🌗 **Moon (Luna)** — `earth/moon` position and apparent position, next rise/set, the eight named phases, `Age`, `Illumination`, `PhaseAngle`, next new/full, and `Track`. `PhaseAt` names the phase from the Moon's elongation from the Sun rather than from its age, so the name follows the sky rather than a mean cycle length. `BrightLimbAt` says which way the lit side faces, from celestial north and from "up" on the observer's screen. Blue-moon detection is **(roadmap)**. The Moon belongs to Earth; other bodies own their own moons.
+- 🪐 **Planets** — one package per planet, `planet/mercury` to `planet/neptune`, each with its own VSOP87 table and the same API: topocentric apparent position (light-time, aberration, nutation), apparent diameter, phase, magnitude (Mallama and Hilton 2018), elongation with a near-Sun flag, rise, set, and transit, and the observer-independent heliocentric position. Importing one planet links only its table; `planet/all` iterates over them all. Positions match JPL Horizons to about 1″ (2″ for Uranus and Neptune).
 - ⭐ **Stars** — an embedded HYG-derived named-star catalog with RA/Dec **and distance**, projected to alt/az for the observer and instant.
 - 🌌 **Constellations** — `constellation.FindAt` looks up the constellation containing an RA/Dec over the IAU (Delporte/Roman) default dataset, with `List` and `Lookup` alongside it. The lookup machinery is universal; the dataset is consumer-overridable.
 - 📐 **Discs, not points** — Sun and Moon positions are the **center of the disc**, always paired with **angular diameter**, so a consumer can size the disc and compute alignment/overlap (eclipses, occultations) purely from the data.
@@ -71,6 +72,60 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 - 🧭 **Configurable segmentation** — twilight thresholds and band labels are data. Earth defaults ship (−18/−12/−6°, golden hour, sunrise/sunset), and `earth.NewSunTimesWith` takes a `Segmentation` to redefine them wholesale.
 - 🕛 **Seamless midnight rollover** — `earth.SegmentAt` answers "which band, and how far through it, at `now`" and stitches across midnight with no gap. Callers ask only for `now`, never for the previous or next day.
 - 🧵 **Stateless & concurrency-safe** — every call takes the observer and `time.Time`; nothing is captured at construction, so the same instance serves many visitors at once.
+
+## 🪐 Planets
+
+Each planet is its own package: `planet/mercury`, `planet/venus`, `planet/mars`, `planet/jupiter`, `planet/saturn`, `planet/uranus`, and `planet/neptune`. Each holds only its own VSOP87 table and has the same API, so importing `planet/mars` links the Mars table and no other. `planet` holds the shared result types, and `planet/all` imports every planet for a caller who wants them all.
+
+### Position, brightness, and phase
+
+```go
+import "github.com/Bugs5382/go-astronomy/planet/mars"
+
+greenwich := astronomy.Observer{Lat: 51.4769, Lng: -0.0005, TZ: time.UTC}
+r, err := mars.Position(greenwich, time.Date(2027, 2, 19, 22, 0, 0, 0, time.UTC)) // near opposition
+if err != nil {
+	panic(err)
+}
+fmt.Printf("alt %.2f az %.2f\n", r.Altitude, r.Azimuth)                     // alt 44.53 az 129.60
+fmt.Printf("%.2f arcsec, mag %.2f\n", float64(r.Diameter)*3600, r.Magnitude) // 13.82 arcsec, mag -1.28
+```
+
+Every planet returns a `planet.Result`: the topocentric geometric altitude and azimuth with the apparent diameter, the apparent RA/Dec of date, distance in au, light-time, magnitude (Mallama and Hilton 2018, with Saturn's rings), phase angle, illuminated fraction, elongation, and a `NearSun` flag.
+
+### Rise, set, and transit
+
+```go
+import "github.com/Bugs5382/go-astronomy/planet/jupiter"
+
+rise, ok, err := jupiter.NextRise(greenwich, time.Date(2027, 9, 1, 0, 0, 0, 0, time.UTC))
+transit, _, _ := jupiter.NextTransit(greenwich, rise)
+set, _, _ := jupiter.NextSet(greenwich, transit)
+// 05:06:53, 11:58:08, 18:49:07 UTC; ok is false when nothing happens within 30 days
+```
+
+### Heliocentric positions
+
+```go
+h := jupiter.Heliocentric(when)              // ecliptic of date: Lon, Lat in degrees, DistanceAU
+e := planet.EarthHeliocentric(when).Vector() // Earth, for the geometric view of Jupiter from Earth
+```
+
+### Every planet
+
+```go
+import "github.com/Bugs5382/go-astronomy/planet/all"
+
+for _, p := range all.Planets() { // Mercury to Neptune; each p is a planet.Body
+	r, _ := p.Position(london, when)
+	fmt.Println(p.Name(), r.Altitude, r.Magnitude)
+}
+p, ok := all.ByName("saturn")
+```
+
+### Accuracy
+
+Against JPL Horizons DE441 (2020 to 2030, plus two conjunctions), the apparent place is within 0.3″ for Mercury, Venus, and Mars, 0.6″ for Jupiter and Saturn, and 1.7″ for Uranus and Neptune. Magnitudes agree to 0.08, and rise, set, and transit fall within Horizons' one-minute step. See the [planets overview](./website/docs/reference/planet.md) for the shared types, VSOP87 coverage, frames, and units, and one page per planet under [`website/docs/reference/planets/`](./website/docs/reference/planets/).
 
 ## 🌓 Which way the Moon is lit
 

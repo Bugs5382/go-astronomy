@@ -38,6 +38,7 @@ Each error-returning package also exports named sentinels you can match with `er
 - `astronomy.ErrInvalidHeight`
 - `earth.ErrInvalidLatitude`, `earth.ErrInvalidLongitude`, `earth.ErrInvalidSegmentation`
 - `star.ErrEmptyMagnitudeRange`
+- `planet.ErrInvalidLatitude`, `planet.ErrInvalidLongitude` (returned by every `planet/<name>` package)
 - `project.ErrInvalidCanvas`, `project.ErrInvalidHorizonFraction`, `project.ErrInvalidPeakAltitude`, `project.ErrInvalidFieldOfView`, `project.ErrInvalidElevationScale`, `project.ErrXModeNotAzimuth`
 
 ```go
