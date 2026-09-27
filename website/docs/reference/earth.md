@@ -169,9 +169,17 @@ func NightDarkness(obs astronomy.Observer, t time.Time) float64
 
 ```go
 func StarPosition(s star.Star, obs astronomy.Observer, t time.Time) (astronomy.Horizontal, error)
+
+type StarField struct{ /* one observer, one instant */ }
+func NewStarField(obs astronomy.Observer, t time.Time) (*StarField, error)
+func (f *StarField) Position(s star.Star) astronomy.Horizontal
 ```
 
-`StarPosition` projects a [`star.Star`](./star.md)'s J2000 equatorial position to the observer's local alt/az at instant `t`. Turning a catalog star into a local direction needs a rotating body and an observer, which is why this Earth-vantage function lives here rather than in the universal `star` package.
+`StarPosition` projects a [`star.Star`](./star.md) to the observer's local alt/az at instant `t`. It carries the star along its space motion (`Star.PositionAt`) and reduces it to its apparent place on the true equator and equinox of date. That reduction applies the IAU 1976 precession, the IAU 1980 nutation, the annual parallax of a star with a distance (0.75″ for Alpha Centauri), and the annual aberration of the Earth's VSOP87 velocity. It then turns the place into the horizon with the apparent sidereal time. Turning a catalog star into a local direction needs a rotating body and an observer, which is why this Earth-vantage function lives here rather than in the universal `star` package.
+
+Against the IAU SOFA library, twenty stars from 1950 to 2100 match to about 0.1″ around the present. They drift by about 0.25″ a century away from 2000, because the IAU 1976 precession is known to run about 0.3″ a century off the IAU 2006 model SOFA uses. The altitude and azimuth leave out the diurnal aberration of the observer's rotation (up to 0.3″) and the Sun's bending of starlight (under 0.01″ more than 45° from the Sun). Before this, only the precession was applied, and stars were off by up to 128″ in 2000 to 2050 (Arcturus-class proper motions), and by 17′ for Barnard's Star a century out.
+
+Most of that work belongs to the instant, not the star: the precession-nutation rotation, the Earth's position and velocity, and the sidereal time take about 4 µs, and each star after that about 0.2 µs. `StarPosition` remembers the last instant's frame, so a loop over the catalog at one instant pays for it once. A `StarField` makes the sharing explicit and holds one observer and one instant; the whole 9,028-star catalog takes about 2 ms. A star at a new instant every call, such as a track across the night, pays the full 4 µs each time. Both give exactly the same answers.
 
 ## 🚑 Errors
 
