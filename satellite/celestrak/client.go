@@ -4,22 +4,25 @@
 // explicit fetcher behind the satellite packages: nothing is fetched unless a
 // caller builds a Client and passes it as the element source.
 //
-// Element sets change a few times a day at most, so the network is hit
-// rarely: each set is cached per catalogue number for a TTL of 24 hours by
-// default, and never refetched sooner than every 2 hours, following
-// CelesTrak's usage guidance (a set is updated a few times a day; download it
-// once and reuse it). Every position and pass is then propagated locally from
-// the cached set. Sets are cached by catalogue number only, never per
-// observer or time, so one fetch serves every observer at every instant.
+// Element sets are cached by catalogue number only, never per observer or
+// time, and every position and pass is propagated locally from the cached
+// set. The network is hit rarely, and a caller never waits on it once a set
+// is cached:
+//
+//   - The first call for a catalogue number fetches synchronously; callers
+//     that arrive together share that one request.
+//   - After that every call answers straight from the cache. Once the set is
+//     older than the refresh age (3 days by default), one background refresh
+//     starts, de-duplicated per catalogue number and never sooner than
+//     MinRefetch (2 hours) after the last attempt, following CelesTrak's usage
+//     guidance. A failed refresh keeps the old set, is logged at warn, and is
+//     retried after MinRefetch.
+//   - With NeverExpire the set is fetched once and never refreshed.
 //
 // The default cache is in-process and is lost on restart. The cache is
 // pluggable (satellite.Cache), so a caller can back it with its own store,
 // such as Redis, to keep sets across restarts and share them between
 // replicas.
-//
-// A failed fetch returns an error. When a set was cached, it is returned too,
-// marked stale, with an error wrapping satellite.ErrStaleElements, and the
-// fetch is not retried for the minimum refetch interval.
 package celestrak
 
 /*
@@ -58,31 +61,39 @@ import (
 const (
 	// DefaultBaseURL is CelesTrak's GP endpoint.
 	DefaultBaseURL = "https://celestrak.org/NORAD/elements/gp.php"
-	// DefaultTTL is how long a fetched set is used before it is refreshed.
-	DefaultTTL = 24 * time.Hour
-	// MinRefetch is the shortest interval between fetches of one set, and
-	// the floor for the TTL.
+	// DefaultRefreshAge is how old a cached set gets before a background
+	// refresh starts.
+	DefaultRefreshAge = 3 * 24 * time.Hour
+	// MinRefetch is the shortest interval between requests for one set, and
+	// the floor for the refresh age.
 	MinRefetch = 2 * time.Hour
 	// DefaultTimeout bounds each request.
 	DefaultTimeout = 15 * time.Second
-	// retention keeps a set in the cache long after its TTL, so it can still
-	// be returned as stale when a refresh fails.
-	retention = 14 * 24 * time.Hour
 )
 
 // Client fetches element sets. Build it with New; it is safe for concurrent
 // use and implements satellite.ElementSource.
 type Client struct {
-	http    *http.Client
-	base    string
-	timeout time.Duration
-	ttl     time.Duration
-	cache   satellite.Cache
-	now     func() time.Time
-	log     log.Logger
+	http       *http.Client
+	base       string
+	timeout    time.Duration
+	refreshAge time.Duration
+	never      bool
+	cache      satellite.Cache
+	now        func() time.Time
+	log        log.Logger
 
-	mu     sync.Mutex
-	failed map[int]time.Time // last failed refresh per catalogue number
+	mu       sync.Mutex
+	attempts map[int]time.Time // last request per catalogue number, any outcome
+	failures map[int]time.Time // last failed first fetch per catalogue number
+	inFlight map[int]*call     // a request under way per catalogue number
+}
+
+// call is one request that callers can share.
+type call struct {
+	done chan struct{}
+	res  Result
+	err  error
 }
 
 var _ satellite.ElementSource = (*Client)(nil)
@@ -118,14 +129,23 @@ func WithTimeout(d time.Duration) Option {
 	}
 }
 
-// WithTTL sets how long a fetched set is used before it is refreshed. It is
-// never less than MinRefetch.
-func WithTTL(d time.Duration) Option {
+// WithRefreshAge sets how old a cached set gets before a background refresh
+// starts. It is never less than MinRefetch.
+func WithRefreshAge(d time.Duration) Option {
 	return func(cl *Client) {
 		if d > 0 {
-			cl.ttl = max(d, MinRefetch)
+			cl.refreshAge = max(d, MinRefetch)
 		}
 	}
+}
+
+// NeverExpire fetches each set once and never refreshes it. Propagation from
+// an old set drifts: fine for a few days, tens to hundreds of kilometres after
+// about a week for a low orbit such as the ISS, and far off after a month or
+// after a reboost. A set too old for SGP4 to propagate gives an error, never
+// a wrong position.
+func NeverExpire() Option {
+	return func(cl *Client) { cl.never = true }
 }
 
 // WithCache sets the cache, for example a Redis-backed satellite.Cache shared
@@ -161,12 +181,14 @@ var defaultLogger = sync.OnceValue(func() log.Logger { return log.NewLogger("go-
 // New returns a Client with the options applied.
 func New(opts ...Option) *Client {
 	cl := &Client{
-		http:    &http.Client{},
-		base:    DefaultBaseURL,
-		timeout: DefaultTimeout,
-		ttl:     DefaultTTL,
-		now:     time.Now,
-		failed:  map[int]time.Time{},
+		http:       &http.Client{},
+		base:       DefaultBaseURL,
+		timeout:    DefaultTimeout,
+		refreshAge: DefaultRefreshAge,
+		now:        time.Now,
+		attempts:   map[int]time.Time{},
+		failures:   map[int]time.Time{},
+		inFlight:   map[int]*call{},
 	}
 	for _, o := range opts {
 		o(cl)

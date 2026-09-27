@@ -108,14 +108,16 @@ func TestSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Elements.SatNum != 25544 || r.Stale || !r.FetchedAt.Equal(c.Now()) {
-		t.Errorf("result %d stale=%v fetched %s", r.Elements.SatNum, r.Stale, r.FetchedAt)
+	if r.Elements.SatNum != 25544 || !r.FetchedAt.Equal(c.Now()) {
+		t.Errorf("result %d fetched %s", r.Elements.SatNum, r.FetchedAt)
 	}
 	want := time.Date(2026, 9, 26, 20, 26, 13, 869024000, time.UTC)
-	if !r.Elements.Epoch().Equal(want) {
-		t.Errorf("epoch %s, want %s", r.Elements.Epoch(), want)
+	if !r.Elements.Epoch().Equal(want) || !r.Epoch.Equal(want) {
+		t.Errorf("epoch %s and %s, want %s", r.Elements.Epoch(), r.Epoch, want)
 	}
-	// Elements, the ElementSource method, answers the same set.
+	if r.Age != c.Now().Sub(want) {
+		t.Errorf("age %v, want %v", r.Age, c.Now().Sub(want))
+	}
 	e, err := cl.Elements(context.Background(), 25544)
 	if err != nil || e.SatNum != 25544 {
 		t.Errorf("Elements = %d, %v", e.SatNum, err)
@@ -125,58 +127,161 @@ func TestSuccess(t *testing.T) {
 	}
 }
 
-// TestTTL checks the cache serves a set for the TTL without a request, and
-// fetches again once it expires.
-func TestTTL(t *testing.T) {
+// waitFor polls until cond holds or a second passes.
+func waitFor(t *testing.T, cond func() bool) bool {
+	t.Helper()
+	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
+		if cond() {
+			return true
+		}
+	}
+	return cond()
+}
+
+// TestAnswersFromStaleCacheWithoutBlocking checks a set past the refresh age
+// is answered at once, while one refresh runs in the background.
+func TestAnswersFromStaleCacheWithoutBlocking(t *testing.T) {
 	t.Parallel()
 	f, c := newFake(t), newClock()
 	cl := client(f, c)
 	ctx := context.Background()
-	_, _ = cl.Fetch(ctx, 25544)
-	c.Add(23 * time.Hour)
-	if r, err := cl.Fetch(ctx, 25544); err != nil || r.Stale || f.calls.Load() != 1 {
-		t.Errorf("within the TTL: stale=%v %v, %d requests", r.Stale, err, f.calls.Load())
-	}
-	c.Add(2 * time.Hour)
-	if r, err := cl.Fetch(ctx, 25544); err != nil || r.Stale || f.calls.Load() != 2 || !r.FetchedAt.Equal(c.Now()) {
-		t.Errorf("after the TTL: stale=%v %v, %d requests", r.Stale, err, f.calls.Load())
-	}
-}
-
-// TestMinimumRefetch checks a TTL below the minimum refetch interval is raised
-// to it, and that a failed refresh is not retried sooner than the interval.
-func TestMinimumRefetch(t *testing.T) {
-	t.Parallel()
-	f, c := newFake(t), newClock()
-	cl := client(f, c, celestrak.WithTTL(30*time.Minute))
-	ctx := context.Background()
-	_, _ = cl.Fetch(ctx, 25544)
-	c.Add(90 * time.Minute)
-	if _, err := cl.Fetch(ctx, 25544); err != nil || f.calls.Load() != 1 {
-		t.Errorf("at 90 min with a 30 min TTL: %v, %d requests (the 2 h minimum applies)", err, f.calls.Load())
-	}
-	c.Add(time.Hour) // 2.5 h: due
-	f.fail(http.StatusServiceUnavailable, "busy", 0)
-	r, err := cl.Fetch(ctx, 25544)
-	if !errors.Is(err, satellite.ErrStaleElements) || !r.Stale || f.calls.Load() != 2 {
-		t.Fatalf("failed refresh: stale=%v %v, %d requests", r.Stale, err, f.calls.Load())
-	}
-	c.Add(time.Hour)
-	if _, err := cl.Fetch(ctx, 25544); !errors.Is(err, satellite.ErrStaleElements) || f.calls.Load() != 2 {
-		t.Errorf("an hour after a failure: %v, %d requests, want no new request", err, f.calls.Load())
-	}
-	c.Add(90 * time.Minute)
-	f.fail(http.StatusOK, "", 0) // healthy again
+	first, _ := cl.Fetch(ctx, 25544)
+	c.Add(4 * 24 * time.Hour) // past the 3-day refresh age
+	f.fail(http.StatusOK, "", 500*time.Millisecond)
 	f.mu.Lock()
 	f.body = nil
 	f.mu.Unlock()
-	if r, err := cl.Fetch(ctx, 25544); err != nil || r.Stale || f.calls.Load() != 3 {
-		t.Errorf("2.5 h after the failure: stale=%v %v, %d requests", r.Stale, err, f.calls.Load())
+	start := time.Now()
+	r, err := cl.Fetch(ctx, 25544)
+	if err != nil || !r.FetchedAt.Equal(first.FetchedAt) {
+		t.Fatalf("stale answer: %v, fetched %s", err, r.FetchedAt)
+	}
+	if d := time.Since(start); d > 100*time.Millisecond {
+		t.Errorf("the stale answer took %v; it should not wait for the refresh", d)
+	}
+	if !waitFor(t, func() bool { return f.calls.Load() == 2 }) {
+		t.Fatalf("%d requests, want the background refresh", f.calls.Load())
+	}
+	if !waitFor(t, func() bool { r, _ := cl.Fetch(ctx, 25544); return r.FetchedAt.Equal(c.Now()) }) {
+		t.Error("the refreshed set never replaced the old one")
 	}
 }
 
-// TestFailures checks each failure returns an error, and no set when nothing
-// was cached.
+// TestOneRefreshForConcurrentCallers checks many callers of a stale set start
+// one refresh, and many callers of an empty cache share one fetch.
+func TestOneRefreshForConcurrentCallers(t *testing.T) {
+	t.Parallel()
+	f, c := newFake(t), newClock()
+	f.fail(http.StatusOK, "", 200*time.Millisecond)
+	f.mu.Lock()
+	f.body = nil
+	f.mu.Unlock()
+	cl := client(f, c)
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	for range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := cl.Fetch(ctx, 25544); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if n := f.calls.Load(); n != 1 {
+		t.Errorf("empty cache, 20 callers: %d requests, want 1", n)
+	}
+	c.Add(4 * 24 * time.Hour)
+	for range 20 {
+		wg.Add(1)
+		go func() { defer wg.Done(); _, _ = cl.Fetch(ctx, 25544) }()
+	}
+	wg.Wait()
+	waitFor(t, func() bool { return f.calls.Load() >= 2 })
+	time.Sleep(300 * time.Millisecond)
+	if n := f.calls.Load(); n != 2 {
+		t.Errorf("stale set, 20 callers: %d requests in all, want 2", n)
+	}
+}
+
+// TestFailedRefreshKeepsTheOldSet checks a failed background refresh keeps
+// the cached set and is not retried before the minimum interval.
+func TestFailedRefreshKeepsTheOldSet(t *testing.T) {
+	t.Parallel()
+	f, c := newFake(t), newClock()
+	cl := client(f, c)
+	ctx := context.Background()
+	first, _ := cl.Fetch(ctx, 25544)
+	c.Add(4 * 24 * time.Hour)
+	f.fail(http.StatusServiceUnavailable, "busy", 0)
+	if r, err := cl.Fetch(ctx, 25544); err != nil || !r.FetchedAt.Equal(first.FetchedAt) {
+		t.Fatalf("stale answer: %v", err)
+	}
+	waitFor(t, func() bool { return f.calls.Load() == 2 })
+	time.Sleep(50 * time.Millisecond)
+	c.Add(time.Hour)
+	if r, err := cl.Fetch(ctx, 25544); err != nil || !r.FetchedAt.Equal(first.FetchedAt) {
+		t.Errorf("after the failure: %v, fetched %s, want the old set", err, r.FetchedAt)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := f.calls.Load(); n != 2 {
+		t.Errorf("an hour after a failed refresh: %d requests, want no retry yet", n)
+	}
+	c.Add(90 * time.Minute)
+	f.fail(http.StatusOK, "", 0)
+	f.mu.Lock()
+	f.body = nil
+	f.mu.Unlock()
+	_, _ = cl.Fetch(ctx, 25544)
+	if !waitFor(t, func() bool { return f.calls.Load() == 3 }) {
+		t.Errorf("2.5 h after the failure: %d requests, want the retry", f.calls.Load())
+	}
+}
+
+// TestMinimumRefetch checks a refresh age below the minimum interval is
+// raised to it.
+func TestMinimumRefetch(t *testing.T) {
+	t.Parallel()
+	f, c := newFake(t), newClock()
+	cl := client(f, c, celestrak.WithRefreshAge(30*time.Minute))
+	ctx := context.Background()
+	_, _ = cl.Fetch(ctx, 25544)
+	c.Add(90 * time.Minute)
+	_, _ = cl.Fetch(ctx, 25544)
+	time.Sleep(50 * time.Millisecond)
+	if n := f.calls.Load(); n != 1 {
+		t.Errorf("at 90 min with a 30 min refresh age: %d requests (the 2 h minimum applies)", n)
+	}
+	c.Add(time.Hour)
+	_, _ = cl.Fetch(ctx, 25544)
+	if !waitFor(t, func() bool { return f.calls.Load() == 2 }) {
+		t.Errorf("at 2.5 h: %d requests, want the refresh", f.calls.Load())
+	}
+}
+
+// TestNeverExpire checks the explicit mode fetches once and never again.
+func TestNeverExpire(t *testing.T) {
+	t.Parallel()
+	f, c := newFake(t), newClock()
+	cl := client(f, c, celestrak.NeverExpire())
+	ctx := context.Background()
+	first, _ := cl.Fetch(ctx, 25544)
+	for range 5 {
+		c.Add(30 * 24 * time.Hour)
+		r, err := cl.Fetch(ctx, 25544)
+		if err != nil || !r.FetchedAt.Equal(first.FetchedAt) {
+			t.Fatalf("%v, fetched %s", err, r.FetchedAt)
+		}
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := f.calls.Load(); n != 1 {
+		t.Errorf("%d requests over five months, want 1", n)
+	}
+}
+
+// TestFailures checks a failed first fetch is an error, and is not retried
+// before the minimum interval.
 func TestFailures(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -197,14 +302,15 @@ func TestFailures(t *testing.T) {
 		cl := client(f, c, celestrak.WithTimeout(100*time.Millisecond))
 		start := time.Now()
 		r, err := cl.Fetch(context.Background(), 25544)
-		if err == nil || errors.Is(err, satellite.ErrStaleElements) || r.Elements.SatNum != 0 {
+		if !errors.Is(err, celestrak.ErrFetch) || r.Elements.SatNum != 0 {
 			t.Errorf("%s: %+v, %v", tc.name, r, err)
-		}
-		if !errors.Is(err, celestrak.ErrFetch) {
-			t.Errorf("%s: %v does not wrap ErrFetch", tc.name, err)
 		}
 		if tc.name == "timeout" && time.Since(start) > time.Second {
 			t.Errorf("timeout took %v", time.Since(start))
+		}
+		c.Add(time.Hour)
+		if _, err := cl.Fetch(context.Background(), 25544); !errors.Is(err, celestrak.ErrFetch) || f.calls.Load() != 1 {
+			t.Errorf("%s: an hour later: %v, %d requests, want the error without a new request", tc.name, err, f.calls.Load())
 		}
 	}
 }
@@ -239,7 +345,8 @@ func TestSharedCache(t *testing.T) {
 	}
 }
 
-// TestContext checks a cancelled context stops the fetch with its error.
+// TestContext checks a cancelled context stops the first fetch with its
+// error.
 func TestContext(t *testing.T) {
 	t.Parallel()
 	f, c := newFake(t), newClock()

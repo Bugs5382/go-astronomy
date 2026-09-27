@@ -50,8 +50,7 @@ var StandardMagnitude = math.NaN()
 // New returns a tracker for the Tiangong space station (the Tianhe core module carries the station's catalogue entry) that takes its element sets from src,
 // for example satellite.StaticElements(elements) or a *celestrak.Client.
 // Its Position(ctx, obs, t) and Passes(ctx, obs, from, to) propagate
-// locally; a stale set from the source is used and reported with an error
-// wrapping satellite.ErrStaleElements.
+// locally, and each result's ElementEpoch says how old the set behind it is.
 func New(src satellite.ElementSource) *satellite.Tracker {
 	return satellite.NewTracker(CatalogNumber, Name, StandardMagnitude, src)
 }

@@ -88,6 +88,9 @@ type Pass struct {
 	// ShadowEntry and ShadowExit are when the satellite enters or leaves the
 	// Earth's shadow during the pass; the zero time when it does not.
 	ShadowEntry, ShadowExit time.Time
+	// ElementEpoch is the epoch of the element set the pass was predicted
+	// from.
+	ElementEpoch time.Time
 }
 
 // Passes returns every pass above opt.MinAltitude whose rise falls in [from,
@@ -178,6 +181,8 @@ func buildPass(obs astronomy.Observer, e Elements, rise, set time.Time, opt Pass
 		Rise: event(obs, e, rise, opt),
 		Peak: event(obs, e, peak, opt),
 		Set:  event(obs, e, set, opt),
+
+		ElementEpoch: e.Epoch(),
 	}
 
 	// Walk the pass once a second for shadow crossings and the visible span,

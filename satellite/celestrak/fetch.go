@@ -52,8 +52,10 @@ type Result struct {
 	Elements satellite.Elements
 	// FetchedAt is when the set was fetched from CelesTrak.
 	FetchedAt time.Time
-	// Stale reports that the set is past its TTL and could not be refreshed.
-	Stale bool
+	// Epoch is the set's epoch, and Age how old it was when this call
+	// answered: how old the data behind a position or pass is.
+	Epoch time.Time
+	Age   time.Duration
 }
 
 // record is what the cache holds for one catalogue number.
@@ -65,58 +67,128 @@ type record struct {
 func key(catalog int) string { return "celestrak:gp:" + strconv.Itoa(catalog) }
 
 // Elements returns the current set for the catalogue number, as
-// satellite.ElementSource. A stale set comes with an error wrapping
-// satellite.ErrStaleElements.
+// satellite.ElementSource.
 func (c *Client) Elements(ctx context.Context, catalog int) (satellite.Elements, error) {
 	r, err := c.Fetch(ctx, catalog)
 	return r.Elements, err
 }
 
-// Fetch returns the set for the catalogue number from the cache while it is
-// within its TTL, and from CelesTrak otherwise. When a refresh fails and a set
-// was cached, that set is returned with Stale set and an error wrapping both
-// satellite.ErrStaleElements and ErrFetch, and no new request is made for
-// MinRefetch. With nothing cached, a failure returns only the error.
+// Fetch returns the set for the catalogue number. With a set cached it
+// answers at once, starting one background refresh when the set is older than
+// the refresh age. With nothing cached it fetches, and callers arriving
+// together share the one request; a failed first fetch is an error, and
+// further calls get the same error without a request until MinRefetch has
+// passed.
 func (c *Client) Fetch(ctx context.Context, catalog int) (Result, error) {
 	if err := ctx.Err(); err != nil {
 		return Result{}, err
 	}
-	now := c.now()
-	cached, haveCache := c.load(ctx, catalog)
-	if haveCache && now.Sub(cached.FetchedAt) < c.ttl {
-		c.log.Debug("element set cache hit", log.F("catalog", catalog), log.F("age_s", int(now.Sub(cached.FetchedAt).Seconds())))
-		return cached, nil
+	if cached, ok := c.load(ctx, catalog); ok {
+		now := c.now()
+		age := now.Sub(cached.FetchedAt)
+		c.log.Debug("element set cache hit", log.F("catalog", catalog), log.F("age_s", int(age.Seconds())))
+		if !c.never && age >= c.refreshAge {
+			c.refreshInBackground(catalog)
+		}
+		return c.stamp(cached), nil
 	}
-	c.mu.Lock()
-	lastFail, failedRecently := c.failed[catalog]
-	failedRecently = failedRecently && now.Sub(lastFail) < MinRefetch
-	c.mu.Unlock()
-	if haveCache && failedRecently {
-		cached.Stale = true
-		c.log.Debug("element set refresh held back after a failure", log.F("catalog", catalog))
-		return cached, fmt.Errorf("%w: %w: last refresh failed at %s", satellite.ErrStaleElements, ErrFetch, lastFail.Format(time.RFC3339))
-	}
+	return c.fetchShared(ctx, catalog)
+}
 
-	r, raw, err := c.fetch(ctx, catalog)
-	if err != nil {
+// stamp fills in the epoch and age of a result.
+func (c *Client) stamp(r Result) Result {
+	r.Epoch = r.Elements.Epoch()
+	r.Age = c.now().Sub(r.Epoch)
+	return r
+}
+
+// fetchShared makes the first request for a catalogue number, or waits on the
+// one already under way.
+func (c *Client) fetchShared(ctx context.Context, catalog int) (Result, error) {
+	c.mu.Lock()
+	if cl, ok := c.inFlight[catalog]; ok {
+		c.mu.Unlock()
+		select {
+		case <-cl.done:
+			return c.stamp(cl.res), cl.err
+		case <-ctx.Done():
+			return Result{}, ctx.Err()
+		}
+	}
+	now := c.now()
+	if last, ok := c.failures[catalog]; ok && now.Sub(last) < MinRefetch {
+		c.mu.Unlock()
+		return Result{}, fmt.Errorf("%w: the last request for %d failed at %s; retrying after %s", ErrFetch, catalog,
+			last.Format(time.RFC3339), last.Add(MinRefetch).Format(time.RFC3339))
+	}
+	cl := &call{done: make(chan struct{})}
+	c.inFlight[catalog] = cl
+	c.attempts[catalog] = now
+	c.mu.Unlock()
+
+	cl.res, cl.err = c.fetchAndStore(ctx, catalog)
+	c.mu.Lock()
+	delete(c.inFlight, catalog)
+	if cl.err == nil {
+		delete(c.failures, catalog)
+	} else if ctx.Err() == nil {
+		c.failures[catalog] = now
+	}
+	c.mu.Unlock()
+	close(cl.done)
+	if cl.err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return Result{}, ctxErr
 		}
-		c.mu.Lock()
-		c.failed[catalog] = now
+		c.log.Warn("element set fetch failed", log.F("catalog", catalog), log.F("reason", cl.err.Error()))
+		return Result{}, cl.err
+	}
+	return c.stamp(cl.res), nil
+}
+
+// refreshInBackground starts one refresh for the catalogue number, unless one
+// is under way or the last request was under MinRefetch ago. The caller
+// already has its answer; a failure keeps the cached set.
+func (c *Client) refreshInBackground(catalog int) {
+	c.mu.Lock()
+	now := c.now()
+	_, busy := c.inFlight[catalog]
+	last, tried := c.attempts[catalog]
+	if busy || (tried && now.Sub(last) < MinRefetch) {
 		c.mu.Unlock()
-		c.log.Warn("element set fetch failed", log.F("catalog", catalog), log.F("reason", err.Error()))
-		if haveCache {
-			cached.Stale = true
-			return cached, fmt.Errorf("%w: %w", satellite.ErrStaleElements, err)
+		return
+	}
+	cl := &call{done: make(chan struct{})}
+	c.inFlight[catalog] = cl
+	c.attempts[catalog] = now
+	c.mu.Unlock()
+	c.log.Debug("element set refresh started", log.F("catalog", catalog))
+	go func() {
+		// The refresh outlives the call that started it, so it has its own
+		// context, bounded by the request timeout.
+		ctx := context.Background()
+		cl.res, cl.err = c.fetchAndStore(ctx, catalog)
+		c.mu.Lock()
+		delete(c.inFlight, catalog)
+		c.mu.Unlock()
+		close(cl.done)
+		if cl.err != nil {
+			c.log.Warn("element set refresh failed; keeping the cached set", log.F("catalog", catalog),
+				log.F("retry_after", now.Add(MinRefetch).Format(time.RFC3339)), log.F("reason", cl.err.Error()))
+			return
 		}
+		c.log.Debug("element set refreshed", log.F("catalog", catalog))
+	}()
+}
+
+// fetchAndStore requests the set and caches it.
+func (c *Client) fetchAndStore(ctx context.Context, catalog int) (Result, error) {
+	r, raw, err := c.fetch(ctx, catalog)
+	if err != nil {
 		return Result{}, err
 	}
-	c.mu.Lock()
-	delete(c.failed, catalog)
-	c.mu.Unlock()
-	r.FetchedAt = now
-	c.store(ctx, catalog, record{FetchedAt: now, OMM: raw})
+	r.FetchedAt = c.now()
+	c.store(ctx, catalog, record{FetchedAt: r.FetchedAt, OMM: raw})
 	return r, nil
 }
 
@@ -144,7 +216,8 @@ func (c *Client) load(ctx context.Context, catalog int) (Result, bool) {
 func (c *Client) store(ctx context.Context, catalog int, rec record) {
 	b, err := json.Marshal(rec)
 	if err == nil {
-		err = c.cache.Set(ctx, key(catalog), b, retention)
+		// No expiry: a set is replaced by the next refresh, never dropped.
+		err = c.cache.Set(ctx, key(catalog), b, 0)
 	}
 	if err != nil {
 		c.log.Warn("element cache write failed", log.F("catalog", catalog), log.F("reason", err.Error()))

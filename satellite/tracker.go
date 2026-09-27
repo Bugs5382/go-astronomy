@@ -28,7 +28,6 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import (
 	"context"
-	"errors"
 	"math"
 	"time"
 
@@ -66,43 +65,43 @@ func (t *Tracker) Elements(ctx context.Context) (Elements, error) {
 	return t.src.Elements(ctx, t.catalog)
 }
 
-// Position returns where the satellite is in the observer's sky at t, from the
-// source's current element set. When the source could only give a stale set,
-// the Look is filled in from it and the error wraps ErrStaleElements.
+// Position returns where the satellite is in the observer's sky at t,
+// propagated locally from the source's current element set. The Look's
+// ElementEpoch says how old that set is. When SGP4 cannot propagate the set
+// to t, as for a very old set whose decay model has brought the satellite
+// down, the error is returned with no Look, never a wrong position.
 func (t *Tracker) Position(ctx context.Context, obs astronomy.Observer, at time.Time) (Look, error) {
 	e, err := t.Elements(ctx)
-	stale := errors.Is(err, ErrStaleElements)
-	if err != nil && !stale {
+	if err != nil {
 		return Look{}, err
 	}
-	l, perr := Position(obs, e, at)
-	if perr != nil {
-		return l, perr
+	l, err := Position(obs, e, at)
+	if err != nil {
+		return Look{}, err
 	}
-	return l, err
+	return l, nil
 }
 
 // Passes returns the satellite's passes over the observer between from and
-// to, with DefaultPassOptions and the tracker's standard magnitude. A stale
-// element set is used and reported as with Position.
+// to, with DefaultPassOptions and the tracker's standard magnitude.
 func (t *Tracker) Passes(ctx context.Context, obs astronomy.Observer, from, to time.Time) ([]Pass, error) {
 	opt := DefaultPassOptions()
 	opt.StdMagnitude = t.stdMag
 	return t.PassesWith(ctx, obs, from, to, opt)
 }
 
-// PassesWith is Passes with caller-supplied options.
+// PassesWith is Passes with caller-supplied options. A propagation error is
+// returned with no passes.
 func (t *Tracker) PassesWith(ctx context.Context, obs astronomy.Observer, from, to time.Time, opt PassOptions) ([]Pass, error) {
 	e, err := t.Elements(ctx)
-	stale := errors.Is(err, ErrStaleElements)
-	if err != nil && !stale {
+	if err != nil {
 		return nil, err
 	}
-	p, perr := Passes(obs, e, from, to, opt)
-	if perr != nil {
-		return p, perr
+	p, err := Passes(obs, e, from, to, opt)
+	if err != nil {
+		return nil, err
 	}
-	return p, err
+	return p, nil
 }
 
 // Magnitude returns the apparent magnitude of a Look for this satellite, from

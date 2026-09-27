@@ -131,6 +131,7 @@ l, err := satellite.Position(sydney, e, time.Date(2026, 9, 26, 4, 5, 3, 0, time.
 | `SunAltitude` | degrees | the Sun's geometric altitude for the observer |
 | `PhaseAngle` | degrees | Sun-satellite-observer; 0 when the observer sees the fully lit side |
 | `Latitude`, `Longitude`, `AltitudeKm` | degrees, km | the WGS84 geodetic sub-satellite point and height |
+| `ElementEpoch` | time | the epoch of the element set the Look was propagated from |
 
 The TEME state is rotated to the Earth-fixed frame through GMST 1982, the angle SGP4 defines TEME against (polar motion, a metre-level effect, is ignored, and UT1 is taken as UTC). `Magnitude` models the satellite as a diffusely reflecting sphere from its standard magnitude at 1000 km and a 90° phase angle. The standard magnitude is not part of an element set, so the caller supplies it; the ISS's is exported for convenience. It returns `+Inf` in shadow.
 
@@ -178,7 +179,7 @@ type ElementSource interface {
 }
 func StaticElements(sets ...Elements) ElementSource
 
-var ErrNoElements, ErrStaleElements error
+var ErrNoElements error
 
 func NewTracker(catalog int, name string, stdMag float64, src ElementSource) *Tracker
 func (t *Tracker) Position(ctx context.Context, obs astronomy.Observer, at time.Time) (Look, error)
@@ -192,7 +193,8 @@ func (t *Tracker) StandardMagnitude() float64
 ```
 
 - **Tracker.** A `Tracker` follows one satellite by its catalogue number, taking element sets from an explicit `ElementSource`. That source is `StaticElements` over sets you already have, or a fetcher such as `celestrak.Client`. The named packages (`iss`, `hubble`, `tiangong`) return one from `New(src)`.
-- **Missing and stale sets.** A source with no set for the number gives `ErrNoElements`. A source that could only return an old set returns it with an error wrapping `ErrStaleElements`. The tracker still computes the position and passes from it and hands that error back, so the caller decides.
+- **Missing sets and old sets.** A source with no set for the number gives `ErrNoElements`. When SGP4 cannot propagate a set to the instant (a very old set whose drag model has taken the orbit out of range, or a decayed satellite), the tracker returns that error with no result, never a wrong position.
+- **How old is the answer.** `Look.ElementEpoch` and `Pass.ElementEpoch` give the epoch of the set each result was computed from.
 
 ## 🗄️ The cache
 

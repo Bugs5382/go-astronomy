@@ -14,18 +14,19 @@ An explicit element-set fetcher for CelesTrak's GP API (`https://celestrak.org/N
 
 ```go
 const (
-	DefaultBaseURL = "https://celestrak.org/NORAD/elements/gp.php"
-	DefaultTTL     = 24 * time.Hour
-	MinRefetch     = 2 * time.Hour
-	DefaultTimeout = 15 * time.Second
+	DefaultBaseURL    = "https://celestrak.org/NORAD/elements/gp.php"
+	DefaultRefreshAge = 3 * 24 * time.Hour
+	MinRefetch        = 2 * time.Hour
+	DefaultTimeout    = 15 * time.Second
 )
 
 var ErrFetch error
 
 type Result struct {
 	Elements  satellite.Elements
-	FetchedAt time.Time
-	Stale     bool
+	FetchedAt time.Time     // when the set was fetched from CelesTrak
+	Epoch     time.Time     // the set's epoch
+	Age       time.Duration // how old the set was when this call answered
 }
 
 func New(opts ...Option) *Client
@@ -35,21 +36,48 @@ func (c *Client) Elements(ctx context.Context, catalog int) (satellite.Elements,
 func WithHTTPClient(c *http.Client) Option
 func WithBaseURL(u string) Option
 func WithTimeout(d time.Duration) Option
-func WithTTL(d time.Duration) Option      // never below MinRefetch
-func WithCache(c satellite.Cache) Option  // default: satellite.NewMemoryCache()
+func WithRefreshAge(d time.Duration) Option // never below MinRefetch
+func NeverExpire() Option                   // fetch once, never refresh
+func WithCache(c satellite.Cache) Option    // default: satellite.NewMemoryCache()
 func WithClock(now func() time.Time) Option
 func WithLogger(l log.Logger) Option
 ```
 
-## 🗄️ Caching: the network is hit rarely
+## 🗄️ What is cached
 
-**What is cached is the element set, keyed by catalogue number only** (`celestrak:gp:25544`), never anything per observer, time, or position. Every position and every pass, for any observer at any time or date, is propagated locally with SGP4 from that one cached set, with no fetch. A service answering thousands of visitors in different places makes one request per satellite per day.
+**The element set, keyed by catalogue number only** (`celestrak:gp:25544`), never anything per observer, time, or position. Every position and every pass, for any observer at any time or date, is propagated locally with SGP4 from that one cached set, with no fetch. A service answering thousands of visitors in different places makes one request per satellite, and then one quiet refresh every few days.
 
+## 🔁 Two modes
 
-- **One request per set per day.** Each set is cached by catalogue number for `DefaultTTL` (24 hours) and never refetched sooner than `MinRefetch` (2 hours), following CelesTrak's usage guidance: sets change a few times a day, so download each once and reuse it. All positions and passes are then propagated locally from the cached set.
-- **Failures.** A failed fetch returns an error wrapping `ErrFetch`. When a set was cached, it comes back too, with `Stale` set and an error wrapping `satellite.ErrStaleElements`, and the fetch is not retried for `MinRefetch`. With nothing cached, there is only the error. A stale set is never returned unflagged.
-- **Shared cache.** `WithCache` takes any `satellite.Cache`, for example one backed by Redis, so replicas and restarts share one fetch. The cache keeps a set for 14 days after its fetch, so it can still be served as stale.
-- **Restarts.** The default `MemoryCache` lives in the process, so a restart loses it and the next call fetches again. To keep sets across restarts and share them between replicas, plug in a `satellite.Cache` backed by your own store, for example Redis:
+### Default: never block, refresh quietly
+
+- **First call.** The first call for a catalogue number fetches synchronously. Callers that arrive together share that one request. A failed first fetch is an error wrapping `ErrFetch`; further calls get the same error without a new request until `MinRefetch` has passed.
+- **Every later call answers straight from the cache.** Elements never expire for callers.
+- **Background refresh.** Once the cached set is older than the refresh age (`DefaultRefreshAge`, 3 days; `WithRefreshAge` to change it), the call that notices starts one refresh in the background and still answers at once. The refresh is de-duplicated, so there is one in flight per catalogue number. It is never sooner than `MinRefetch` (2 hours) after the last request, following CelesTrak's usage guidance: sets change a few times a day, so fetch each rarely and reuse it.
+- **A failed refresh** keeps the old set, is logged at warn, and is retried after `MinRefetch`.
+- **Age.** `Result.Epoch` and `Result.Age`, and `ElementEpoch` on every `satellite.Look` and `satellite.Pass`, show how old the data behind an answer is.
+
+### `NeverExpire()`: fetch once
+
+The set is fetched once and never refreshed. That suits a batch job or a demo. It does not suit a long-running service, because propagation from an old set drifts (see below). When a set is so old that SGP4 cannot propagate it (its drag model takes the orbit out of range, or the satellite decays), the tracker returns that propagation error with no result, never a wrong position.
+
+## ⏳ How element sets drift
+
+An element set is a fit to tracking data at its epoch. It is propagated forward by a model that only approximates the atmosphere, so its error grows with age. Rough figures for a low orbit such as the ISS:
+
+| age of the set | position error | what it means |
+| --- | --- | --- |
+| hours to a day | about a kilometre | as good as it gets |
+| a few days | a few kilometres | under a second of pass timing (the ISS moves 7.7 km/s); fine |
+| about a week | tens to hundreds of kilometres | pass times off by seconds to tens of seconds |
+| a month or more | can be far off, and SGP4 may refuse to propagate | not usable |
+| after an ISS reboost | tens of kilometres at once, whatever the age | refresh after a burn |
+
+Higher and steadier orbits, such as Hubble, degrade more slowly. The default refresh every 3 days keeps a low orbit within a few kilometres.
+
+## 💾 Restarts and replicas
+
+The default `MemoryCache` lives in the process, so a restart loses it and the next call fetches again. To keep sets across restarts and share them between replicas, plug in a `satellite.Cache` backed by your own store. With Redis, the adapter is a few lines in your code; go-astronomy has no Redis dependency:
 
 ```go
 // RedisCache adapts a go-redis client to satellite.Cache. It lives in your
@@ -72,16 +100,8 @@ elements := celestrak.New(celestrak.WithCache(RedisCache{R: rdb}))
 tracker := iss.New(elements)
 ```
 
-- **Logging.** It logs through go-log: catalogue numbers, cache hits, requests, and failures. It logs nothing else about the caller.
 
-## ⏳ How element sets go stale
-
-An element set is a fit to tracking data at its epoch. It is propagated forward by a model that only approximates the atmosphere, so its error grows with age:
-
-- **ISS.** The station is low enough for drag to matter, and it is reboosted every few weeks. A fresh set is good to about a kilometre, and the error grows by roughly a few kilometres a day. After a reboost, a set from before the burn can be tens of kilometres off. At 7.7 km/s a few kilometres is well under a second of pass timing and a fraction of a degree on the sky.
-- **Higher and steadier orbits** (Hubble, Tiangong between reboosts) degrade more slowly.
-
-CelesTrak updates the sets a few times a day, so refreshing once a day keeps the error to a few kilometres, which is plenty for placing a satellite in the sky and timing a pass. `Elements.Age` reports how old the set in hand is. A stale set (a refresh that failed) is flagged with `satellite.ErrStaleElements`, so a caller can decide whether it is still good enough.
+Sets are stored with no expiry; each refresh replaces the old one. The fetcher logs through go-log: catalogue numbers, cache hits, requests, refreshes, and failures. It logs nothing else about the caller.
 
 ## 🚀 Examples
 
@@ -106,14 +126,14 @@ for range 2 {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(r.Elements.SatNum, r.Elements.Epoch().Format(time.RFC3339), "stale:", r.Stale)
+	fmt.Println(r.Elements.SatNum, r.Epoch.Format(time.RFC3339), "fetched", !r.FetchedAt.IsZero())
 }
 fmt.Println("requests:", requests)
 ```
 
 ```text
-25544 2026-09-26T20:26:13Z stale: false
-25544 2026-09-26T20:26:13Z stale: false
+25544 2026-09-26T20:26:13Z fetched true
+25544 2026-09-26T20:26:13Z fetched true
 requests: 1
 ```
 

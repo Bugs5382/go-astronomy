@@ -33,20 +33,13 @@ import (
 	"fmt"
 )
 
-var (
-	// ErrNoElements is the cause when a source has no element set for the
-	// catalogue number asked for.
-	ErrNoElements = errors.New("satellite: no element set for the catalogue number")
-	// ErrStaleElements accompanies an element set a source could not refresh:
-	// the set is returned with this error, and the caller decides whether an
-	// old set is good enough.
-	ErrStaleElements = errors.New("satellite: element set is stale")
-)
+// ErrNoElements is the cause when a source has no element set for the
+// catalogue number asked for.
+var ErrNoElements = errors.New("satellite: no element set for the catalogue number")
 
 // ElementSource supplies the current element set for a NORAD catalogue
-// number. A source that returns a stale set returns it together with an
-// error wrapping ErrStaleElements; any other error comes with no set.
-// Implementations must be safe for concurrent use.
+// number. An error comes with no set. Implementations must be safe for
+// concurrent use.
 type ElementSource interface {
 	Elements(ctx context.Context, catalog int) (Elements, error)
 }

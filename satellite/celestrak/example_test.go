@@ -52,12 +52,12 @@ func ExampleClient_Fetch() {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println(r.Elements.SatNum, r.Elements.Epoch().Format(time.RFC3339), "stale:", r.Stale)
+		fmt.Println(r.Elements.SatNum, r.Epoch.Format(time.RFC3339), "fetched", !r.FetchedAt.IsZero())
 	}
 	fmt.Println("requests:", requests)
 	// Output:
-	// 25544 2026-09-26T20:26:13Z stale: false
-	// 25544 2026-09-26T20:26:13Z stale: false
+	// 25544 2026-09-26T20:26:13Z fetched true
+	// 25544 2026-09-26T20:26:13Z fetched true
 	// requests: 1
 }
 

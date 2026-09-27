@@ -38,8 +38,8 @@ func (t *Tracker) StandardMagnitude() float64
 
 - `Position` is the satellite as the observer sees it: altitude, azimuth, range, range rate, sunlight, the Sun's altitude for the observer, the phase angle, and the sub-satellite point (see [`satellite.Look`](../satellite.md)).
 - `Passes` are intervals with rise, peak, and set, whether each is visible (the satellite sunlit while the observer is in darkness), and shadow entry and exit. `Passes` uses `satellite.DefaultPassOptions` with the standard magnitude, and `PassesWith` takes your own options.
-- A source with no set for 48274 gives `satellite.ErrNoElements`. A stale set from the fetcher is still used, and the error wraps `satellite.ErrStaleElements`, so the caller can decide whether to trust it.
-- Check `Elements.Age`: a low orbit's element set goes stale in days.
+- A source with no set for 48274 gives `satellite.ErrNoElements`. A set too old for SGP4 to propagate gives the propagation error and no result, never a wrong position.
+- Every `Look` and `Pass` carries `ElementEpoch`, the epoch of the set it was computed from, so a caller can see how old the data is. The CelesTrak fetcher keeps its set fresh in the background (see [celestrak](./celestrak.md)).
 
 ## 🚀 Examples
 

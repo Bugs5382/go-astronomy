@@ -54,16 +54,8 @@ func TestStaticElements(t *testing.T) {
 	}
 }
 
-// staleSource returns its elements with ErrStaleElements, as a fetcher does
-// when it could not refresh a cached set.
-type staleSource struct{ e satellite.Elements }
-
-func (s staleSource) Elements(context.Context, int) (satellite.Elements, error) {
-	return s.e, satellite.ErrStaleElements
-}
-
 // TestTracker checks a tracker asks its source for its own catalogue number
-// and matches the engine, and passes a stale set on with its flag.
+// and matches the engine, and that results carry the element epoch.
 func TestTracker(t *testing.T) {
 	t.Parallel()
 	e := iss(t)
@@ -96,13 +88,25 @@ func TestTracker(t *testing.T) {
 		t.Errorf("a source without the tracker's number: %v", err)
 	}
 
-	stale := satellite.NewTracker(25544, "ISS (ZARYA)", -1.8, staleSource{e})
-	l, err := stale.Position(ctx, obs, when)
-	if !errors.Is(err, satellite.ErrStaleElements) || l != want {
-		t.Errorf("stale: %+v, %v", l, err)
+	if !got.ElementEpoch.Equal(e.Epoch()) || !passes[0].ElementEpoch.Equal(e.Epoch()) {
+		t.Errorf("element epoch on results %s and %s, want %s", got.ElementEpoch, passes[0].ElementEpoch, e.Epoch())
 	}
-	ps, err := stale.Passes(ctx, obs, from, from.Add(6*time.Hour))
-	if !errors.Is(err, satellite.ErrStaleElements) || len(ps) != len(passes) {
-		t.Errorf("stale passes: %d, %v", len(ps), err)
+}
+
+// TestTrackerSurfacesPropagationErrors checks a set too old to propagate is an
+// error, never a wrong position.
+func TestTrackerSurfacesPropagationErrors(t *testing.T) {
+	t.Parallel()
+	e := iss(t)
+	tr := satellite.NewTracker(25544, "ISS (ZARYA)", satellite.ISSStandardMagnitude, satellite.StaticElements(e))
+	// Ten years on, SGP4's drag model has driven the orbit out of range.
+	l, err := tr.Position(context.Background(), astronomy.Observer{}, e.Epoch().AddDate(10, 0, 0))
+	var pe *satellite.PropagationError
+	if !errors.As(err, &pe) || l != (satellite.Look{}) {
+		t.Errorf("ten-year-old set: %+v, %v, want a PropagationError and no position", l, err)
+	}
+	p, err := tr.Passes(context.Background(), astronomy.Observer{}, e.Epoch().AddDate(10, 0, 0), e.Epoch().AddDate(10, 0, 1))
+	if !errors.As(err, &pe) || p != nil {
+		t.Errorf("ten-year-old passes: %d, %v", len(p), err)
 	}
 }

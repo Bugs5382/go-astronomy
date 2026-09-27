@@ -59,6 +59,9 @@ type Look struct {
 	// Latitude, Longitude, and AltitudeKm are the geodetic sub-satellite point
 	// and height above the WGS84 ellipsoid.
 	Latitude, Longitude, AltitudeKm float64
+	// ElementEpoch is the epoch of the element set the Look was propagated
+	// from; t minus it is how old the data behind the answer is.
+	ElementEpoch time.Time
 }
 
 // Position returns where the satellite is in the observer's sky at t. The
@@ -131,6 +134,7 @@ func look(obs astronomy.Observer, e Elements, t time.Time) (Look, error) {
 		Latitude:     sgLat,
 		Longitude:    sgLng,
 		AltitudeKm:   sgAlt,
+		ElementEpoch: e.Epoch(),
 	}
 	return out, err
 }

@@ -154,7 +154,7 @@ l, err := tracker.Position(ctx, denver, now) // l.Altitude, l.Azimuth, l.RangeKm
 
 ### Fetching, rarely
 
-- **`celestrak`** caches each element set per catalogue number for 24 hours and never refetches sooner than every 2 hours, following CelesTrak's guidance. Every position and pass is propagated locally from the cached set. A failed refresh returns an error, and a cached set comes back only flagged stale.
+- **`celestrak`** caches each element set by catalogue number and never makes a caller wait once it has one: every call answers from the cache, and a set older than 3 days is refreshed in the background (one refresh per satellite, never sooner than every 2 hours, following CelesTrak's guidance; a failed refresh keeps the old set). `celestrak.NeverExpire()` fetches once and never refreshes. Every position and pass is propagated locally, and `ElementEpoch` on each result says how old the set behind it is.
 - **`horizons`** fetches a 30-day table at a one-hour step in one request, caches it, and interpolates locally (eight-point Lagrange, within 4.4 milliarcseconds of a ten-minute table). It refetches only when an instant leaves the window.
 - **Shared behaviour.** Both take `ctx`, have a default timeout, accept an injected `*http.Client`, and use a pluggable `satellite.Cache`.
 - **What is cached.** CelesTrak sets are cached by catalogue number only, never per observer or time, so one daily fetch serves every observer at every time; positions and passes are always propagated locally.
@@ -181,7 +181,7 @@ elements := celestrak.New(celestrak.WithCache(RedisCache{R: rdb}))
 tracker := iss.New(elements)
 ```
 
-- **Staleness.** A set's error grows with age, roughly a few kilometres a day for the ISS (drag, and reboosts every few weeks). A daily refresh keeps that to a few kilometres, well under a second of pass timing; `Elements.Age` says how old a set is.
+- **Drift.** A set's error grows with age. For the ISS it is about a kilometre when fresh and a few kilometres after a few days. It reaches tens to hundreds of kilometres after about a week, and can be far off after a month or an ISS reboost. The default 3-day background refresh keeps it within a few kilometres, well under a second of pass timing. With `NeverExpire`, a set too old for SGP4 gives an error, never a wrong position.
 
 ### Why JWST and Roman have no Passes
 
