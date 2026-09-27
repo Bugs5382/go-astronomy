@@ -29,10 +29,11 @@ sidebar_position: 1
 | `.../earth` | Earth traits | Sun position and track, twilight bands, refraction, polar states, seasons, ground darkness, and star projection for an Earth observer. |
 | `.../earth/moon` | Earth traits | Luna: position, apparent position, phases, rise/set, and an arc track. |
 | `.../planet/<name>` | universal | One package per planet, Mercury to Neptune, each with only its own VSOP87 table: topocentric apparent position, diameter, phase, magnitude, elongation, rise/set/transit, and the heliocentric position. `.../planet` holds the shared types and `.../planet/all` iterates over them all. |
+| `.../sky` | any vantage | An observer on any body (the Moon, Mars, any planet) resolving any other body: position, phase, and rise, set, and transit on that body's own day, with its IAU rotation, shape, refraction, and twilight. An Earth site gives the v1 answers. |
 | `.../satellite` | Earth satellites | TLE and OMM parsing, SGP4/SDP4, look angles, sunlight, magnitude, and passes; `.../satellite/iss`, `hubble`, `tiangong`, `jwst`, and `roman` fix one object each, and `.../satellite/celestrak` and `.../satellite/horizons` are the explicit, cached fetchers. |
 | `.../openmeteo` | optional adapter | Looks an observer's height up from the Open-Meteo elevation API. The only package that reaches the network. |
 
-Adding a future body (for example `mars/`) would not change `sun`, `star`, or `constellation`.
+Other vantages go through `sky`; a new body adds its IAU elements and a position, and changes nothing in `sun`, `star`, or `constellation`.
 
 ## 🙏 Credits and licensing
 

@@ -190,17 +190,20 @@ func Position(obs astronomy.Observer, t time.Time) (astronomy.Position, error) {
 }
 
 // ApparentPosition is Position with atmospheric refraction applied to the
-// altitude, using the Earth refraction model. Refraction lifts the apparent
-// altitude above the geometric altitude while the Moon is at or above the
-// horizon and is not applied once the Moon is well below it, where it is not
-// visible. The azimuth and diameter are unchanged from Position.
+// altitude, using the Earth refraction model in the standard atmosphere at the
+// observer's height (earth.StandardAtmosphere; exactly the sea-level
+// refraction at sea level). Refraction lifts the apparent altitude above the
+// geometric altitude while the Moon is at or above the horizon and is not
+// applied once the Moon is well below it, where it is not visible. The azimuth
+// and diameter are unchanged from Position. For measured air, take Position and
+// add earth.MeasuredAtmosphere(p, t).Refraction(alt, obs.Height).
 func ApparentPosition(obs astronomy.Observer, t time.Time) (astronomy.Position, error) {
 	if err := validateObserver(obs); err != nil {
 		return astronomy.Position{}, err
 	}
 	pos := position(obs, t)
 	if pos.Altitude >= refractionFloor {
-		if r := earth.Refraction(pos.Altitude); r > 0 {
+		if r := earth.StandardAtmosphere.Refraction(pos.Altitude, obs.Height); r > 0 {
 			pos.Altitude += r
 		}
 	}

@@ -114,6 +114,13 @@ type Level struct {
 	// astronomical twilight are the Sun's depression below the astronomical
 	// horizon and do not take the dip. WithTwilightDip sets it on every level.
 	DipCorrected bool
+	// Refracted marks a Level whose Altitude includes the standard horizon
+	// refraction, HorizonRefraction. The Segmentation's Atmosphere scales that
+	// refraction for the observer's height: in thinner air the Level rises by
+	// the refraction lost, in denser air it falls. DefaultSegmentation sets it
+	// on the sunrise and sunset levels, the same two levels that take the dip;
+	// the twilight levels are geometric depressions and carry no refraction.
+	Refracted bool
 }
 
 // Segmentation divides the Sun's altitude over a civil day into named bands. It
@@ -128,8 +135,15 @@ type Segmentation struct {
 	// state detection, at sea level. It is lowered by the horizon dip for an
 	// observer above sea level.
 	Horizon float64
+	// HorizonRefracted marks the Horizon as including the standard horizon
+	// refraction, like Level.Refracted; DefaultSegmentation sets it.
+	HorizonRefracted bool
 	// Levels are the altitude boundaries in ascending order of Altitude.
 	Levels []Level
+	// Atmosphere is the air that scales the refraction of the Horizon and of
+	// every Refracted level. The zero value is StandardAtmosphere, the ISA at
+	// the observer's height; set measured air with WithAtmosphere.
+	Atmosphere Atmosphere
 }
 
 // DefaultSegmentation is the Earth default division of the day: astronomical
@@ -140,17 +154,20 @@ type Segmentation struct {
 // customize.
 //
 // For an observer above sea level, the sunrise and sunset crossing and the top
-// of the sunrise band are lowered by the horizon dip; the twilight levels are
-// not (see Level.DipCorrected and WithTwilightDip).
+// of the sunrise band are lowered by the horizon dip and raised by the
+// refraction the thinner air does not give; the twilight levels are not moved
+// (see Level.DipCorrected, Level.Refracted, WithTwilightDip, and
+// HorizonAltitudeAt).
 var DefaultSegmentation = Segmentation{
-	Night:   LabelNight,
-	Horizon: HorizonAltitude,
+	Night:            LabelNight,
+	Horizon:          HorizonAltitude,
+	HorizonRefracted: true,
 	Levels: []Level{
 		{Altitude: -18, Rising: LabelAstronomicalDawn, Setting: LabelAstronomicalDusk},
 		{Altitude: -12, Rising: LabelNauticalDawn, Setting: LabelNauticalDusk},
 		{Altitude: -6, Rising: LabelCivilDawn, Setting: LabelCivilDusk},
-		{Altitude: HorizonAltitude, Rising: LabelSunrise, Setting: LabelSunset, DipCorrected: true},
-		{Altitude: -0.3, Rising: LabelGoldenHour, Setting: LabelGoldenHour, DipCorrected: true},
+		{Altitude: HorizonAltitude, Rising: LabelSunrise, Setting: LabelSunset, DipCorrected: true, Refracted: true},
+		{Altitude: -0.3, Rising: LabelGoldenHour, Setting: LabelGoldenHour, DipCorrected: true, Refracted: true},
 		{Altitude: 6, Rising: LabelDay, Setting: LabelDay},
 	},
 }
@@ -171,20 +188,39 @@ func (s Segmentation) WithTwilightDip() Segmentation {
 	return out
 }
 
+// WithAtmosphere returns a copy of the segmentation whose refracted levels
+// and horizon are scaled for the air a instead of the standard atmosphere, for
+// example MeasuredAtmosphere(station hPa, temperature C) from a local reading.
+// The receiver is not modified.
+func (s Segmentation) WithAtmosphere(a Atmosphere) Segmentation {
+	out := s
+	out.Atmosphere = a
+	return out
+}
+
 // atHeight returns a copy of the segmentation for an observer at height h:
-// the horizon and every dip-corrected level lowered by the horizon dip. At
-// sea level it returns the segmentation unchanged.
+// the horizon and every dip-corrected level lowered by the horizon dip, and
+// the horizon (when HorizonRefracted) and every refracted level raised by the
+// horizon refraction the segmentation's air does not give. At sea level in the
+// standard atmosphere it returns the segmentation unchanged.
 func (s Segmentation) atHeight(h astronomy.Height) Segmentation {
 	dip := HorizonDip(h)
-	if dip == 0 {
+	lift := refractionLoss(s.Atmosphere.Factor(h))
+	if dip == 0 && lift == 0 {
 		return s
 	}
 	out := s
 	out.Horizon -= dip
+	if s.HorizonRefracted {
+		out.Horizon += lift
+	}
 	out.Levels = make([]Level, len(s.Levels))
 	for i, l := range s.Levels {
 		if l.DipCorrected {
 			l.Altitude -= dip
+		}
+		if l.Refracted {
+			l.Altitude += lift
 		}
 		out.Levels[i] = l
 	}

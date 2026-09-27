@@ -30,10 +30,11 @@ import (
 	"github.com/Bugs5382/go-astronomy/earth"
 )
 
-// horizonRefraction is the atmospheric refraction at the horizon, in degrees
-// (about 34 arc minutes). Combined with the Moon's apparent semidiameter it
-// gives the geometric center altitude at which the upper limb touches the
-// horizon, the threshold for rise and set.
+// horizonRefraction is the atmospheric refraction at the horizon at sea level,
+// in degrees (about 34 arc minutes). Combined with the Moon's apparent
+// semidiameter it gives the geometric center altitude at which the upper limb
+// touches the horizon, the threshold for rise and set. Above sea level it is
+// scaled by the standard atmosphere (issue 68).
 const horizonRefraction = 0.5667
 
 const (
@@ -70,19 +71,22 @@ func NextSet(obs astronomy.Observer, t time.Time) (time.Time, bool, error) {
 // topocentric geometric center altitude minus the rise/set threshold, which is
 // the negative of the horizon refraction plus the Moon's apparent semidiameter
 // at that instant, lowered further by the horizon dip for the observer's
-// height (issue 52). A rising crossing is a change from negative to
-// non-negative; a setting crossing is the reverse. The Moon's geocentric
-// place comes from its places at whole hours (moonPlaces), so a search that
-// walks a day computes the lunar series about 26 times, not 160.
+// height (issue 52). The horizon refraction is horizonRefraction scaled by
+// the standard atmosphere at the observer's height (issue 68). A rising
+// crossing is a change from negative to non-negative; a setting crossing is
+// the reverse. The Moon's geocentric place comes from its places at whole
+// hours (moonPlaces), so a search that walks a day computes the lunar series
+// about 26 times, not 160.
 func nextCrossing(obs astronomy.Observer, t time.Time, rising bool) (time.Time, bool, error) {
 	if err := validateObserver(obs); err != nil {
 		return time.Time{}, false, err
 	}
 	dip := earth.HorizonDip(obs.Height)
+	refraction := horizonRefraction * earth.StandardAtmosphere.Factor(obs.Height)
 	places := newMoonPlaces()
 	f := func(when time.Time) float64 {
 		hz, semiDeg := horizontal(obs, when, places.at(when))
-		return hz.Altitude - (-(horizonRefraction + semiDeg + dip))
+		return hz.Altitude - (-(refraction + semiDeg + dip))
 	}
 
 	prev := f(t)

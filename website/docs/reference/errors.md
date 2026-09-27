@@ -31,6 +31,9 @@ The codes are part of the public contract: a code is never renumbered, only adde
 | 7014 | `CodeInvalidElements` | Satellite element set (TLE or OMM) that could not be parsed. |
 | 7015 | `CodeSatellitePropagation` | SGP4 could not propagate the element set to the instant (for example, a decayed satellite). |
 | 7016 | `CodeInvalidPassWindow` | Pass window end not after start, or longer than 31 days. |
+| 7017 | `CodeInvalidAtmosphere` | Measured atmosphere with a pressure that is not positive and finite, or a temperature that is not finite or at or below −273 °C. |
+| 7018 | `CodeUnknownBody` | A `sky` site or target with no body, a site on the Sun, or a planet with no IAU rotation model. |
+| 7019 | `CodeSameBody` | A `sky` target that is the body the site stands on. |
 
 These constants are declared on the root `astronomy` package.
 
@@ -39,9 +42,10 @@ These constants are declared on the root `astronomy` package.
 Each error-returning package also exports named sentinels you can match with `errors.Is`, wrapped inside the coded error:
 
 - `astronomy.ErrInvalidHeight`
-- `earth.ErrInvalidLatitude`, `earth.ErrInvalidLongitude`, `earth.ErrInvalidSegmentation`
+- `earth.ErrInvalidLatitude`, `earth.ErrInvalidLongitude`, `earth.ErrInvalidSegmentation`, `earth.ErrInvalidAtmosphere`
 - `star.ErrEmptyMagnitudeRange`
 - `planet.ErrInvalidLatitude`, `planet.ErrInvalidLongitude` (returned by every `planet/<name>` package)
+- `sky.ErrUnknownBody`, `sky.ErrSameBody`, `sky.ErrInvalidLatitude`, `sky.ErrInvalidLongitude`
 - `satellite.ErrMalformedTLE`, `satellite.ErrChecksum`, `satellite.ErrMalformedOMM`, `satellite.ErrDecayed` (and the other propagation sentinels), `satellite.ErrInvalidPassWindow`, `satellite.ErrInvalidLatitude`, `satellite.ErrInvalidLongitude`
 - `project.ErrInvalidCanvas`, `project.ErrInvalidHorizonFraction`, `project.ErrInvalidPeakAltitude`, `project.ErrInvalidFieldOfView`, `project.ErrInvalidElevationScale`, `project.ErrXModeNotAzimuth`
 

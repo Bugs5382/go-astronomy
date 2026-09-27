@@ -99,7 +99,10 @@ The embedded star catalog is a curated subset of the HYG database
 (Hipparcos-Yale-Gliese), compiled by David Nash / Astronomy Nexus. The subset
 contains stars with apparent magnitude <= 6.5 together with every star carrying
 a proper name; the remaining rows and columns of the full ~120,000-star catalog
-are omitted to keep the binary small.
+are omitted to keep the binary small. The proper motion and radial velocity
+columns were added from the same release; the declination proper motion of
+Barnard's Star (HIP 87937), which HYG caps at 9999.99 mas/yr, was restored to
+the Hipparcos value of 10326.93 mas/yr.
 
   HYG database, version 4.4
   https://codeberg.org/astronexus/hyg

@@ -68,9 +68,10 @@ func TestInterpolatedRiseSetMatchesDirect(t *testing.T) {
 		{Lat: -33.9, Lng: 151.2},
 	} {
 		dip := earth.HorizonDip(obs.Height)
+		refraction := horizonRefraction * earth.StandardAtmosphere.Factor(obs.Height)
 		direct := func(when time.Time) float64 {
 			hz, semi := topocentric(obs, when)
-			return hz.Altitude + horizonRefraction + semi + dip
+			return hz.Altitude + refraction + semi + dip
 		}
 		for d := 0; d < 60; d += 3 {
 			from := time.Date(2027, 3, 1, 5, 0, 0, 0, time.UTC).AddDate(0, 0, d)

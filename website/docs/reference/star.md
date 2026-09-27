@@ -27,8 +27,18 @@ type Star struct {
 	HD            string  // Henry Draper number, or ""
 	HR            string  // Harvard Revised (Bright Star) number, or ""
 	Gliese        string  // Gliese-Jahreiss identifier, or ""
+
+	PMRA           float64 // proper motion along the parallel, mas/yr (includes cos Dec), or 0
+	PMDec          float64 // proper motion in declination, mas/yr, or 0
+	RadialVelocity float64 // km/s, positive receding, or 0
 }
+
+func (s Star) PositionAt(t time.Time) (raDeg, decDeg float64)
 ```
+
+`PositionAt` carries the star along its space motion from the J2000.0 catalog epoch to instant `t`, still on the J2000 equator and equinox. With a distance and a radial velocity the motion is a straight line in space, so the proper motion speeds up as a star approaches. Barnard's Star, the fastest, moves 10.4″ a year. A star with no known motion stays at its catalog place. Against the IAU SOFA library (`pmsafe`), twenty stars including Barnard's Star, Kapteyn's Star, and Groombridge 1830 agree to 0.005″ from 1950 to 2100. The motion is the star's own and the same for every observer; the apparent place from Earth is `earth.StarPosition`.
+
+The proper motions and radial velocities are HYG v4.4's, which carry Hipparcos's. HYG's fixed-width source caps a motion at 9999.99 mas/yr, so Barnard's Star's declination motion is restored to the Hipparcos 10326.93.
 
 ## 🔎 Accessors
 

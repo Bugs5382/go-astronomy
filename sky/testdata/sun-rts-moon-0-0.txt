@@ -1,0 +1,19 @@
+# The Sun rising and setting from the Moon at 0 E, 0 N.
+# JPL Horizons rise/transit/set: COMMAND=10 CENTER=coord@301 SITE_COORD=0,0,0
+# START=2027-01-01 STOP=2027-03-01 STEP=1 m R_T_S_ONLY=TVH APPARENT=AIRLESS (queried 2026-09-27)
+# Horizons stamps each event with the one-minute step at or after it.
+# Target body name: Sun (10)                        {source: DE441}
+# Center body name: Moon (301)                      {source: DE441}
+# Target pole/equ : IAU_SUN                         {East-longitude positive}
+# Target radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}
+# Center geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}
+# Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}
+# Center radii    : 1737.4, 1737.4, 1737.4 km       {Equator_a, b, pole_c}
+# Atmos refraction: NO (AIRLESS)
+# time kind az_deg el_deg
+2027-01-15T04:37:00Z r 90.742082406 -0.262610181
+2027-01-22T15:06:00Z t 180.726576664 89.501606221
+2027-01-30T01:33:00Z s 269.729415571 -0.275682544
+2027-02-13T19:03:00Z r 89.922846206 -0.262056418
+2027-02-21T05:24:00Z t 359.634800618 89.654463950
+2027-02-28T15:41:00Z s 270.562111786 -0.269243531

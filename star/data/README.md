@@ -36,3 +36,11 @@ Only the columns the library exposes are kept. Right ascension is stored in
 | `hd`     | Henry Draper catalog number (may be empty)          |
 | `hr`     | Harvard Revised / Bright Star number (may be empty) |
 | `gl`     | Gliese-Jahreiss identifier (may be empty)           |
+| `pmra`   | Proper motion in RA, mas/yr, times cos Dec (may be empty for none) |
+| `pmdec`  | Proper motion in Dec, mas/yr (may be empty for none) |
+| `rv`     | Radial velocity, km/s (may be empty for none)       |
+
+The three motion columns were joined from HYG v4.4 row by row (by Hipparcos,
+HD, or Gliese number, else by position; all 9028 rows matched). HYG's
+fixed-width source caps a motion at 9999.99 mas/yr, so the declination motion
+of Barnard's Star (HIP 87937) is the Hipparcos value, 10326.93, instead.
