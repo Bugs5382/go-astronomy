@@ -56,6 +56,10 @@ At high latitudes the Sun may not cross the horizon on a given day. That is an e
 
 A planet's position is computed in two steps, and the first is published on its own. `planet.Heliocentric` gives the planet seen from the Sun's centre, a vector that does not depend on anyone; `planet.Position` then reduces it to one observer on Earth, with light-time, aberration, nutation, and the topocentric correction. Keeping the first step public is what lets an observer on another body be built later: Earth seen from Mars is the difference of two heliocentric vectors, just as Mars seen from Earth is.
 
+## ⛰️ Height and the horizon
+
+An observer's height moves the horizon, not the sky. From height the sea horizon sits below the astronomical horizon by the dip, so rise and set move while positions barely change (the height shifts the Sun's and Moon's parallax by under an arc second). The height is optional: leave it out for sea level and no network, set it by hand in feet or metres, or look it up with a resolver. The calculation functions never look anything up. A moving observer, such as a plane, passes its position and height for each instant. See [Observer and height](./reference/observer.md).
+
 ## 🎯 Accuracy
 
 The target is amateur, arcminute-class accuracy, using an in-house implementation of the Meeus algorithms. The Sun and Moon are computed on Terrestrial Time, with ΔT taken from the IERS leap-second table, and include nutation and the observer's parallax; against JPL Horizons DE441 the Moon is good to about 10″ and the Sun, from the VSOP87 series, to about 2″. Star positions still omit nutation and aberration. Do not rely on the library for higher-precision ephemeris work.

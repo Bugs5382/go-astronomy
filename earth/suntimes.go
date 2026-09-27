@@ -68,7 +68,8 @@ func validateObserver(obs astronomy.Observer) error {
 	if obs.Lng < -180 || obs.Lng > 180 {
 		return apperr.Coded(astronomy.CodeInvalidLongitude, ErrInvalidLongitude)
 	}
-	return nil
+	// A NaN or infinite height; any real height is used as given.
+	return obs.Height.Err()
 }
 
 // SunTimes is the Sun's civil day for one observer: the ordered twilight and
@@ -98,11 +99,15 @@ func NewSunTimes(obs astronomy.Observer, date time.Time) (*SunTimes, error) {
 }
 
 // NewSunTimesWith is NewSunTimes with a caller-supplied Segmentation, letting a
-// consumer redefine the thresholds and labels wholesale.
+// consumer redefine the thresholds and labels wholesale. For an observer above
+// sea level the segmentation's horizon and its dip-corrected levels are
+// lowered by the horizon dip first; the result must still be strictly
+// ascending.
 func NewSunTimesWith(obs astronomy.Observer, date time.Time, seg Segmentation) (*SunTimes, error) {
 	if err := validateObserver(obs); err != nil {
 		return nil, err
 	}
+	seg = seg.atHeight(obs.Height)
 	if err := validateSegmentation(seg); err != nil {
 		return nil, err
 	}
@@ -429,11 +434,13 @@ func SegmentAt(obs astronomy.Observer, t time.Time) (Segment, float64, error) {
 	return SegmentAtWith(obs, t, DefaultSegmentation)
 }
 
-// SegmentAtWith is SegmentAt with a caller-supplied Segmentation.
+// SegmentAtWith is SegmentAt with a caller-supplied Segmentation, adjusted for
+// the observer's height as in NewSunTimesWith.
 func SegmentAtWith(obs astronomy.Observer, t time.Time, seg Segmentation) (Segment, float64, error) {
 	if err := validateObserver(obs); err != nil {
 		return Segment{}, 0, err
 	}
+	seg = seg.atHeight(obs.Height)
 	if err := validateSegmentation(seg); err != nil {
 		return Segment{}, 0, err
 	}

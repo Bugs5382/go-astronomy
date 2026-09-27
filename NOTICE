@@ -50,6 +50,16 @@ Elements, and the apparent magnitude formulas of Mallama and Hilton:
     The Astronomical Almanac", Astronomy and Computing, 25, 10.
 
 --------------------------------------------------------------------------------
+Elevation data (fetched at run time by the optional openmeteo package)
+--------------------------------------------------------------------------------
+The openmeteo package asks the Open-Meteo elevation API for an observer's
+height. No elevation data is embedded. Open-Meteo serves the Copernicus DEM
+GLO-90; its data is offered under the Creative Commons Attribution 4.0 licence,
+and a consumer that shows the heights should credit Open-Meteo.
+
+  https://open-meteo.com/en/docs/elevation-api
+
+--------------------------------------------------------------------------------
 Star catalog (embedded: star/data/stars.csv)
 --------------------------------------------------------------------------------
 The embedded star catalog is a curated subset of the HYG database

@@ -70,9 +70,10 @@ const (
 	// CodeXModeNotAzimuth marks a column-to-azimuth inverse query on a projection
 	// whose horizontal mode is not azimuth-based, so no azimuth axis exists.
 	CodeXModeNotAzimuth = 7010
+	// CodeInvalidHeight marks an observer Height that is NaN or infinite.
+	CodeInvalidHeight = 7011
 	// CodeInvalidBody marks a planet.Body that is not a planet, or is Earth
-	// where an observable target is needed. (7011 and 7012 belong to the
-	// observer elevation codes.)
+	// where an observable target is needed.
 	CodeInvalidBody = 7013
 )
 
@@ -89,6 +90,7 @@ var errorEntries = []apperr.Entry{
 	{Code: CodeInvalidFieldOfView, Title: "projection", Cause: "azimuth field of view or arc span not positive"},
 	{Code: CodeInvalidElevationScale, Title: "projection", Cause: "geometric elevation degrees-per-pixel not positive"},
 	{Code: CodeXModeNotAzimuth, Title: "projection", Cause: "column-to-azimuth query on a non-azimuth horizontal mode"},
+	{Code: CodeInvalidHeight, Title: "observer", Cause: "observer height is NaN or infinite"},
 	{Code: CodeInvalidBody, Title: "planet", Cause: "body is not an observable planet"},
 }
 

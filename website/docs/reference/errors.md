@@ -27,6 +27,7 @@ The codes are part of the public contract: a code is never renumbered, only adde
 | 7008 | `CodeInvalidFieldOfView` | Azimuth field of view or arc span not positive. |
 | 7009 | `CodeInvalidElevationScale` | `Geometric` elevation degrees-per-pixel not positive. |
 | 7010 | `CodeXModeNotAzimuth` | Column-to-azimuth query on a non-azimuth horizontal mode. |
+| 7011 | `CodeInvalidHeight` | Observer `Height` that is NaN or infinite. |
 | 7013 | `CodeInvalidBody` | `planet.Body` that is not an observable planet (or is Earth where a target is needed). |
 
 These constants are declared on the root `astronomy` package.
@@ -35,6 +36,7 @@ These constants are declared on the root `astronomy` package.
 
 Each error-returning package also exports named sentinels you can match with `errors.Is`, wrapped inside the coded error:
 
+- `astronomy.ErrInvalidHeight`
 - `earth.ErrInvalidLatitude`, `earth.ErrInvalidLongitude`, `earth.ErrInvalidSegmentation`
 - `star.ErrEmptyMagnitudeRange`
 - `planet.ErrInvalidLatitude`, `planet.ErrInvalidLongitude`, `planet.ErrInvalidBody`

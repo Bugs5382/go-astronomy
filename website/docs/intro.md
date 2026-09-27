@@ -29,6 +29,7 @@ sidebar_position: 1
 | `.../earth` | Earth traits | Sun position and track, twilight bands, refraction, polar states, seasons, ground darkness, and star projection for an Earth observer. |
 | `.../earth/moon` | Earth traits | Luna: position, apparent position, phases, rise/set, and an arc track. |
 | `.../planet` | universal | Mercury to Neptune: topocentric apparent position, diameter, phase, magnitude, elongation, rise/set/transit, and observer-independent heliocentric positions (generated VSOP87 tables). |
+| `.../openmeteo` | optional adapter | Looks an observer's height up from the Open-Meteo elevation API. The only package that reaches the network. |
 
 Adding a future body (for example `mars/`) would not change `sun`, `star`, or `constellation`.
 
