@@ -190,11 +190,24 @@ func build(obs astronomy.Observer, date time.Time, seg Segmentation) *SunTimes {
 }
 
 // segmentDay locates every altitude-threshold crossing across the day, adds the
-// day boundaries and solar noon as splits, and labels each resulting interval by
-// the altitude zone at its midpoint and which side of noon it falls on.
+// day boundaries, solar noon, and any lower culmination (solar midnight) as
+// splits, and labels each resulting interval by the altitude zone at its
+// midpoint and whether the Sun is climbing or sinking there.
+//
+// Splitting at both culminations means no interval contains an altitude
+// extremum, so the trend at the midpoint holds for the whole interval. A band
+// that runs through local midnight therefore keeps one label on both sides of
+// the date boundary (issue 50). A lower culmination below the lowest level sits
+// inside the night band, whose label does not depend on the trend, so it is not
+// added as a split there.
 func segmentDay(altAt func(time.Time) float64, seg Segmentation, start, end, noon time.Time) []Segment {
 	boundaries := []time.Time{start, end, noon}
 	boundaries = append(boundaries, crossings(altAt, seg, start, end)...)
+	for _, low := range lowerCulminations(altAt, start, end) {
+		if altAt(low) >= seg.Levels[0].Altitude {
+			boundaries = append(boundaries, low)
+		}
+	}
 
 	sort.Slice(boundaries, func(i, j int) bool { return boundaries[i].Before(boundaries[j]) })
 	boundaries = dedupTimes(boundaries, start, end)
@@ -203,7 +216,7 @@ func segmentDay(altAt func(time.Time) float64, seg Segmentation, start, end, noo
 	for i := 0; i+1 < len(boundaries); i++ {
 		from, to := boundaries[i], boundaries[i+1]
 		mid := from.Add(to.Sub(from) / 2)
-		label := zoneLabel(seg, altAt(mid), mid.Before(noon))
+		label := zoneLabel(seg, altAt(mid), climbing(altAt, mid))
 		segments = append(segments, Segment{
 			Label:   label,
 			From:    from,
@@ -266,10 +279,42 @@ func bisect(altAt func(time.Time) float64, lo, hi time.Time, thr float64) time.T
 	return lo.Add(hi.Sub(lo) / 2)
 }
 
+// trendStep is the half-width of the window used to read the Sun's altitude
+// trend at an instant. Near a culmination the altitude changes by well under a
+// thousandth of a degree over it, but segments never contain a culmination, so
+// the sign of the difference is reliable at every segment midpoint.
+const trendStep = 30 * time.Second
+
+// climbing reports whether the Sun's altitude is increasing at t.
+func climbing(altAt func(time.Time) float64, t time.Time) bool {
+	return altAt(t.Add(trendStep)) > altAt(t.Add(-trendStep))
+}
+
+// lowerCulminations returns every lower culmination of the Sun (solar
+// midnight, a local minimum of altitude) strictly inside (start, end). Minima
+// are bracketed by the coarse scan, starting one step before the day so a
+// minimum near either edge is still seen, and refined by ternary search.
+func lowerCulminations(altAt func(time.Time) float64, start, end time.Time) []time.Time {
+	var out []time.Time
+	prev2, prev1 := altAt(start.Add(-coarseStep)), altAt(start)
+	for t := start.Add(coarseStep); !t.After(end.Add(coarseStep)); t = t.Add(coarseStep) {
+		a := altAt(t)
+		if prev1 <= prev2 && prev1 < a {
+			centre := t.Add(-coarseStep)
+			low := ternaryMax(func(x time.Time) float64 { return -altAt(x) }, centre.Add(-coarseStep), t)
+			if low.After(start) && low.Before(end) {
+				out = append(out, low)
+			}
+		}
+		prev2, prev1 = prev1, a
+	}
+	return out
+}
+
 // zoneLabel names the band an altitude falls in: the deep-night label below the
 // lowest level, otherwise the rising or setting label of the highest level at or
-// below the altitude, chosen by which side of solar noon the sample lies on.
-func zoneLabel(seg Segmentation, alt float64, beforeNoon bool) string {
+// below the altitude, chosen by whether the Sun is climbing or sinking.
+func zoneLabel(seg Segmentation, alt float64, rising bool) string {
 	if alt < seg.Levels[0].Altitude {
 		return seg.Night
 	}
@@ -281,7 +326,7 @@ func zoneLabel(seg Segmentation, alt float64, beforeNoon bool) string {
 			break
 		}
 	}
-	if beforeNoon {
+	if rising {
 		return owner.Rising
 	}
 	return owner.Setting
@@ -376,10 +421,10 @@ func ternaryMax(f func(time.Time) float64, lo, hi time.Time) time.Time {
 
 // SegmentAt returns the band containing t, the fraction of that band elapsed at
 // t (in [0, 1)), and any error, using the Earth DefaultSegmentation. It resolves
-// the correct civil day internally and stitches the deep-night band across
+// the correct civil day internally and stitches a band that runs through
 // midnight, so a live clock reads continuously from one civil day into the next:
-// the day's trailing night and the next day's leading night are reported as one
-// span.
+// the day's trailing band and the next day's leading band, when they carry the
+// same label, are reported as one span.
 func SegmentAt(obs astronomy.Observer, t time.Time) (Segment, float64, error) {
 	return SegmentAtWith(obs, t, DefaultSegmentation)
 }
@@ -405,16 +450,21 @@ func SegmentAtWith(obs astronomy.Observer, t time.Time, seg Segmentation) (Segme
 	}
 	band := day.segments[idx]
 
+	// A band that runs through midnight carries the same label on both dates, so
+	// join it with its neighbour across the boundary. A band that ends exactly at
+	// midnight has a differently labelled neighbour and stays as it is.
 	seg2 := band
 	switch {
 	case idx == 0:
 		prev := build(obs, day.start.AddDate(0, 0, -1), seg)
-		last := prev.segments[len(prev.segments)-1]
-		seg2 = Segment{Label: last.Label, From: last.From, To: band.To}
+		if last := prev.segments[len(prev.segments)-1]; last.Label == band.Label {
+			seg2 = Segment{Label: band.Label, From: last.From, To: band.To}
+		}
 	case idx == len(day.segments)-1:
 		next := build(obs, day.end, seg)
-		first := next.segments[0]
-		seg2 = Segment{Label: band.Label, From: band.From, To: first.To}
+		if first := next.segments[0]; first.Label == band.Label {
+			seg2 = Segment{Label: band.Label, From: band.From, To: first.To}
+		}
 	}
 	seg2.Seconds = seg2.To.Sub(seg2.From).Seconds()
 

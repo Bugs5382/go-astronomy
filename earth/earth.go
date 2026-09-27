@@ -70,17 +70,19 @@ const (
 const HorizonAltitude = -0.833
 
 // Level is one altitude boundary in a Segmentation together with the labels of
-// the band lying immediately above it. As the Sun climbs above Altitude toward
-// solar noon it enters the band named Rising; as it sinks below Altitude after
-// noon it enters the band named Setting. The band above the highest Level is
-// the daytime band and is split at solar noon into its Rising (morning) and
+// the band lying immediately above it. While the Sun climbs through the band
+// (from solar midnight toward solar noon) the band is named Rising; while it
+// sinks through it (from noon toward solar midnight) it is named Setting. The
+// label follows the Sun's motion, not the clock, so a band that runs past local
+// midnight keeps its label on both dates. The day is split at solar noon and at
+// solar midnight, so the band above the highest Level has Rising (morning) and
 // Setting (afternoon) halves.
 type Level struct {
 	// Altitude is the geometric center altitude of the boundary, in degrees.
 	Altitude float64
-	// Rising labels the band above this Level on the morning side of noon.
+	// Rising labels the band above this Level while the Sun climbs.
 	Rising string
-	// Setting labels the band above this Level on the evening side of noon.
+	// Setting labels the band above this Level while the Sun sinks.
 	Setting string
 }
 

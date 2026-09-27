@@ -66,8 +66,8 @@ func (s Segment) Contains(t time.Time) bool
 
 type Level struct {
 	Altitude float64 // geometric center altitude of the boundary, degrees
-	Rising   string  // label of the band above this level, morning side of noon
-	Setting  string  // label of the band above this level, evening side of noon
+	Rising   string  // label of the band above this level while the Sun climbs
+	Setting  string  // label of the band above this level while the Sun sinks
 }
 
 type Segmentation struct {
@@ -79,7 +79,7 @@ type Segmentation struct {
 var DefaultSegmentation Segmentation
 ```
 
-A `Segmentation` divides the Sun's altitude over a civil day into named bands. `DefaultSegmentation` is the Earth default: astronomical (−18°), nautical (−12°), and civil (−6°) twilight, the sunrise/sunset horizon crossing (−0.833°, upper limb including refraction), a short sunrise/sunset band up to −0.3°, golden hour up to +6°, and full day above that. The daytime band is split at solar noon into its morning (`Rising`) and afternoon (`Setting`) halves. Treat `DefaultSegmentation` as read-only; build a fresh value to customize.
+A `Segmentation` divides the Sun's altitude over a civil day into named bands. `DefaultSegmentation` is the Earth default: astronomical (−18°), nautical (−12°), and civil (−6°) twilight, the sunrise/sunset horizon crossing (−0.833°, upper limb including refraction), a short sunrise/sunset band up to −0.3°, golden hour up to +6°, and full day above that. A band takes its `Rising` label while the Sun climbs through it and its `Setting` label while the Sun sinks, so a twilight band that runs past local midnight keeps one label on both dates. The day is split at solar noon, and at solar midnight when the Sun stays above the lowest level all night, so the daytime band has morning (`Rising`) and afternoon (`Setting`) halves. Treat `DefaultSegmentation` as read-only; build a fresh value to customize.
 
 The default band labels are exported as constants: `LabelNight`, `LabelAstronomicalDawn`, `LabelNauticalDawn`, `LabelCivilDawn`, `LabelSunrise`, `LabelGoldenHour`, `LabelDay`, `LabelSunset`, `LabelCivilDusk`, `LabelNauticalDusk`, `LabelAstronomicalDusk`.
 
