@@ -75,37 +75,41 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 
 ## 🛰️ Satellites
 
-The `satellite` package places Earth satellites, the ISS among them, in an observer's sky from an element set you supply. It parses TLEs and CCSDS OMM (JSON or XML), propagates them with SGP4/SDP4, and never reaches the network.
+The `satellite` package is the engine: TLE and CCSDS OMM parsing, SGP4/SDP4, look angles, sunlight, magnitude, and passes. The named packages fix one object each: `satellite/iss`, `satellite/hubble`, and `satellite/tiangong` in Earth orbit, and `satellite/jwst` and `satellite/roman` out at the Sun-Earth L2 point. Nothing is fetched implicitly: element sets and ephemerides come from a source the caller passes in, either its own or the explicit fetchers `satellite/celestrak` and `satellite/horizons`.
 
-### Element sets
-
-```go
-e, err := satellite.ParseTLE(line1, line2) // checksums, Alpha-5 catalogue numbers
-sets, err := satellite.ParseOMM(r)          // CelesTrak or Space-Track OMM, JSON or XML
-if e.Age(time.Now()) > 3*24*time.Hour {
-	// a low orbit's element set is stale after a few days: refresh it
-}
-```
-
-### Where it is, and when it passes
+### ISS passes and position
 
 ```go
+import (
+	"github.com/Bugs5382/go-astronomy/satellite"
+	"github.com/Bugs5382/go-astronomy/satellite/celestrak"
+	"github.com/Bugs5382/go-astronomy/satellite/iss"
+)
+
+tracker := iss.New(celestrak.New())   // or iss.New(satellite.StaticElements(myElements))
 denver := astronomy.Observer{Lat: 39.74, Lng: -104.99}
-l, err := satellite.Position(denver, e, time.Now())
-// l.Altitude, l.Azimuth (degrees), l.RangeKm, l.Sunlit, l.Magnitude(satellite.ISSStandardMagnitude)
 
-opt := satellite.DefaultPassOptions()
-opt.StdMagnitude = satellite.ISSStandardMagnitude
-passes, err := satellite.Passes(denver, e, from, from.Add(24*time.Hour), opt)
+passes, err := tracker.Passes(ctx, denver, now, now.Add(24*time.Hour))
 for _, p := range passes {
 	// p.Rise, p.Peak, p.Set; p.Visible (sunlit while you are in darkness);
-	// p.ShadowEntry, where it vanishes into the Earth's shadow
+	// p.ShadowEntry, where it vanishes into the Earth's shadow; p.Peak.Magnitude
 }
+l, err := tracker.Position(ctx, denver, now) // l.Altitude, l.Azimuth, l.RangeKm, l.Sunlit
 ```
+
+### Fetching, rarely
+
+- **`celestrak`** caches each element set per catalogue number for 24 hours and never refetches sooner than every 2 hours, following CelesTrak's guidance. Every position and pass is propagated locally from the cached set. A failed refresh returns an error, and a cached set comes back only flagged stale.
+- **`horizons`** fetches a 30-day table at a one-hour step in one request, caches it, and interpolates locally (eight-point Lagrange, within 4.4 milliarcseconds of a ten-minute table). It refetches only when an instant leaves the window.
+- **Shared behaviour.** Both take `ctx`, have a default timeout, accept an injected `*http.Client`, and use a pluggable `satellite.Cache`. You can back that cache with Redis to share fetches across replicas; go-astronomy itself has no Redis dependency.
+
+### Why JWST and Roman have no Passes
+
+At L2, 1.2 to 1.8 million km out, SGP4 and element sets do not apply, so their ephemerides come from JPL Horizons. The telescopes drift about a degree a day near the anti-Sun point and rise and set once a day like faint stars, so they expose `Position` only. Roman launched on 2026-08-30. Horizons has its predicted trajectory only through its latest published file, and an instant past it is an error, not an extrapolation.
 
 ### Accuracy
 
-The SGP4 port matches the reference verification output to under 0.1 m. Against Skyfield on the same element set, passes agree to 0.2 s and shadow crossings to 0.05 s. The real limit is the element set's age. See the [satellite reference page](./website/docs/reference/satellite.md) for frames, units, magnitudes, and errors.
+The SGP4 port matches the reference verification output to under 0.1 m. Against Skyfield on the same element set, passes agree to 0.2 s and shadow crossings to 0.05 s. The real limit is the element set's age (`Elements.Age`). See the [satellite reference](./website/docs/reference/satellite.md) and the per-package pages under [`website/docs/reference/satellites/`](./website/docs/reference/satellites/).
 
 ## 🌓 Which way the Moon is lit
 

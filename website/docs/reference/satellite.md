@@ -10,6 +10,21 @@ Import path: `github.com/Bugs5382/go-astronomy/satellite`
 
 Earth satellites, the ISS among them, placed in an observer's sky from an element set the caller supplies. An element set is measured, not derived, and goes stale in days, so it is an input: the package parses it and never fetches one.
 
+## 🗂️ The satellite packages
+
+| package | import path | what it is |
+| --- | --- | --- |
+| `satellite` | `github.com/Bugs5382/go-astronomy/satellite` | this page: the engine (TLE and OMM parsing, SGP4/SDP4, look angles, passes, magnitude), trackers, element sources, and the cache |
+| `iss` | `.../satellite/iss` | [the International Space Station](./satellites/iss.md), NORAD 25544 |
+| `hubble` | `.../satellite/hubble` | [the Hubble Space Telescope](./satellites/hubble.md), NORAD 20580 |
+| `tiangong` | `.../satellite/tiangong` | [the Tiangong space station](./satellites/tiangong.md), NORAD 48274 |
+| `celestrak` | `.../satellite/celestrak` | [the CelesTrak element fetcher](./satellites/celestrak.md) |
+| `horizons` | `.../satellite/horizons` | [the JPL Horizons ephemeris fetcher](./satellites/horizons.md) |
+| `jwst` | `.../satellite/jwst` | [the James Webb Space Telescope](./satellites/jwst.md), at L2, from Horizons |
+| `roman` | `.../satellite/roman` | [the Nancy Grace Roman Space Telescope](./satellites/roman.md), bound for L2, from Horizons |
+
+Nothing is fetched unless the caller builds a fetcher and passes it in. The engine and the named packages compute everything locally.
+
 ## 🚀 Quick example
 
 ```go
@@ -154,6 +169,45 @@ A pass is an interval, not an instant: the station crosses the sky in minutes, a
 `DefaultPassOptions()` is `{MinAltitude: 0, DarkSunAltitude: -6, Step: 10s, StdMagnitude: NaN}`. Each `PassEvent` carries the `Time`, the `Altitude` and `Azimuth`, the `RangeKm`, `Sunlit`, and the `Magnitude` (`NaN` without a standard magnitude, `+Inf` in shadow).
 
 Against Skyfield, run on the same element set for two observers over two days, rise, peak, and set agree to 0.2 s, shadow crossings to 0.05 s, and peak altitude to 0.01°.
+
+## 🎯 Trackers and element sources
+
+```go
+type ElementSource interface {
+	Elements(ctx context.Context, catalog int) (Elements, error)
+}
+func StaticElements(sets ...Elements) ElementSource
+
+var ErrNoElements, ErrStaleElements error
+
+func NewTracker(catalog int, name string, stdMag float64, src ElementSource) *Tracker
+func (t *Tracker) Position(ctx context.Context, obs astronomy.Observer, at time.Time) (Look, error)
+func (t *Tracker) Passes(ctx context.Context, obs astronomy.Observer, from, to time.Time) ([]Pass, error)
+func (t *Tracker) PassesWith(ctx context.Context, obs astronomy.Observer, from, to time.Time, opt PassOptions) ([]Pass, error)
+func (t *Tracker) Magnitude(l Look) float64
+func (t *Tracker) Elements(ctx context.Context) (Elements, error)
+func (t *Tracker) CatalogNumber() int
+func (t *Tracker) Name() string
+func (t *Tracker) StandardMagnitude() float64
+```
+
+- **Tracker.** A `Tracker` follows one satellite by its catalogue number, taking element sets from an explicit `ElementSource`. That source is `StaticElements` over sets you already have, or a fetcher such as `celestrak.Client`. The named packages (`iss`, `hubble`, `tiangong`) return one from `New(src)`.
+- **Missing and stale sets.** A source with no set for the number gives `ErrNoElements`. A source that could only return an old set returns it with an error wrapping `ErrStaleElements`. The tracker still computes the position and passes from it and hands that error back, so the caller decides.
+
+## 🗄️ The cache
+
+```go
+type Cache interface {
+	Get(ctx context.Context, key string) ([]byte, bool, error)
+	Set(ctx context.Context, key string, value []byte, expiry time.Duration) error
+}
+func NewMemoryCache(opts ...CacheOption) *MemoryCache
+func WithCacheClock(now func() time.Time) CacheOption
+```
+
+- **What it is for.** The CelesTrak and Horizons fetchers keep what they fetch in a `Cache`. The default is the in-process `MemoryCache`.
+- **Plugging in your own.** The interface is small and free of any store dependency. A consumer can plug in Redis (or anything else) to share fetches across restarts and replicas: `celestrak.New(celestrak.WithCache(myRedisCache))`.
+- **Semantics.** An expiry of zero keeps a value until it is replaced. A store error is treated as a miss.
 
 ## 🧭 Frames and units
 

@@ -32,7 +32,11 @@ Module path: `github.com/Bugs5382/go-astronomy`
 | `github.com/Bugs5382/go-astronomy/constellation` | universal (roadmap) | Boundary lookup by RA/Dec; IAU dataset is the overridable default. |
 | `github.com/Bugs5382/go-astronomy/earth` | Earth traits (roadmap) | `earth.SunPosition(obs, t)`, `earth.SunTrack(obs, date, samples)` (disc-center alt/az plus apparent diameter), `earth.NewSunTimes(obs, date)`, twilight bands, `earth.DefaultSegmentation`, `earth.Refraction`, polar states. |
 | `github.com/Bugs5382/go-astronomy/earth/moon` | Earth traits (roadmap) | Luna: `Position`/`ApparentPosition`, `NextRise`/`NextSet`, `BrightLimbAt`, phases (`Age`, `Illumination`, `PhaseAngle`, next new/full), `Track`. |
-| `github.com/Bugs5382/go-astronomy/satellite` | Earth satellites | `ParseTLE`/`ParseOMM` (caller-supplied elements, no network), SGP4/SDP4 `Propagate`, `Position(obs, elements, t)` (alt/az, range, sunlit, magnitude), `Passes` (rise/peak/set, visibility, shadow entry/exit). |
+| `github.com/Bugs5382/go-astronomy/satellite` | Earth satellites | Engine: `ParseTLE`/`ParseOMM`, SGP4/SDP4 `Propagate`, `Position(obs, elements, t)`, `Passes`, `Look.Magnitude`; `Tracker`, `ElementSource`/`StaticElements`, and the pluggable `Cache`. No network. |
+| `github.com/Bugs5382/go-astronomy/satellite/{iss,hubble,tiangong}` | named satellites | `New(src)` returns a `satellite.Tracker` for NORAD 25544, 20580, and 48274: `Position(ctx, obs, t)`, `Passes(ctx, obs, from, to)`. |
+| `github.com/Bugs5382/go-astronomy/satellite/celestrak` | explicit fetcher | CelesTrak GP element sets, cached per catalogue number (24 h TTL, 2 h minimum refetch), stale sets flagged. |
+| `github.com/Bugs5382/go-astronomy/satellite/horizons` | explicit fetcher | JPL Horizons tables over a window (30 days at 1 h), cached and interpolated locally; `NewTracker`. |
+| `github.com/Bugs5382/go-astronomy/satellite/{jwst,roman}` | L2 telescopes | `New(horizons.Client)`: `Position` only (no SGP4 or passes at L2). |
 | `github.com/Bugs5382/go-astronomy/openmeteo` | optional adapter | `astronomy.ElevationResolver` backed by the Open-Meteo elevation API (`New`, `ResolveObserver`, in-process cache, go-log logging). The only package that reaches the network. |
 | `github.com/Bugs5382/go-astronomy/internal/...` | internal | Math core (`angles`, `julian`, `coordinates`, `ephemeris`, `project`). Unexported by policy — do not import. |
 
