@@ -19,7 +19,7 @@ func Position(obs astronomy.Observer, t time.Time) (astronomy.Position, error)
 func ApparentPosition(obs astronomy.Observer, t time.Time) (astronomy.Position, error)
 ```
 
-`Position` returns the geometric topocentric alt/az of the Moon's disc center, paired with its topocentric apparent diameter (the observer's distance, from the IAU mean lunar radius of 1737.4 km). `ApparentPosition` adds atmospheric refraction so the altitude matches what an observer sees. Both validate the observer and return a coded error for an out-of-range latitude or longitude.
+`Position` returns the geometric topocentric alt/az of the Moon's disc center, paired with its topocentric apparent diameter (the observer's distance, from the IAU mean lunar radius of 1737.4 km). `ApparentPosition` adds atmospheric refraction so the altitude matches what an observer sees, scaled by the standard atmosphere at the observer's height (`earth.StandardAtmosphere`; unchanged at sea level). For measured air, add `earth.MeasuredAtmosphere(p, t).Refraction(alt, obs.Height)` to `Position`'s altitude. Both validate the observer and return a coded error for an out-of-range latitude or longitude.
 
 ## 🌗 Phases and illumination
 
@@ -66,7 +66,7 @@ func NextRise(obs astronomy.Observer, t time.Time) (time.Time, bool, error)
 func NextSet(obs astronomy.Observer, t time.Time) (time.Time, bool, error)
 ```
 
-`NextRise` and `NextSet` return the first instant strictly after `t` at which the Moon's upper limb crosses the horizon, and a boolean that is false when no crossing occurs within the search window (which can happen at high latitudes, where the Moon can stay above or below the horizon for many days). The search spans a full synodic month. For an observer above sea level the horizon is lowered by the dip (see [Observer and height](./observer.md)), so the Moon rises earlier and sets later. Both return a coded error for an out-of-range observer, including `astronomy.ErrInvalidHeight` for a NaN or infinite height.
+`NextRise` and `NextSet` return the first instant strictly after `t` at which the Moon's upper limb crosses the horizon, and a boolean that is false when no crossing occurs within the search window (which can happen at high latitudes, where the Moon can stay above or below the horizon for many days). The search spans a full synodic month. For an observer above sea level the horizon is lowered by the dip and the 34′ of horizon refraction is scaled by the thinner air (see [Refraction and height](./earth.md#-refraction-and-height)), so the Moon rises earlier and sets later, by the dip's worth less the refraction lost. Both return a coded error for an out-of-range observer, including `astronomy.ErrInvalidHeight` for a NaN or infinite height.
 
 ## 🌓 Bright limb
 

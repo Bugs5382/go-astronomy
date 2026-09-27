@@ -45,7 +45,8 @@ const (
 
 // NextRise returns the first instant strictly after t at which the planet's
 // centre rises above planet.HorizonAltitude, lowered by the horizon dip for the
-// observer's height, and true, or false when none happens within 30 days.
+// observer's height and raised by the refraction the thinner air there does
+// not give, and true, or false when none happens within 30 days.
 func (s *Spec) NextRise(obs astronomy.Observer, t time.Time) (time.Time, bool, error) {
 	return s.scan(obs, t, altitude, true, false)
 }
@@ -70,10 +71,12 @@ func (s *Spec) NextTransit(obs astronomy.Observer, t time.Time) (time.Time, bool
 }
 
 // altitude is the planet's height above the horizon the observer sees: the
-// refracted horizon, lowered by the dip of the sea horizon from the
-// observer's height.
+// refracted horizon, with the refraction scaled by the standard atmosphere at
+// the observer's height, lowered by the dip of the sea horizon from there.
+// planet.HorizonAltitude is all refraction, so it scales as a whole.
 func altitude(obs astronomy.Observer, r planet.Result, _ time.Time) float64 {
-	return r.Altitude - (planet.HorizonAltitude - earth.HorizonDip(obs.Height))
+	horizon := planet.HorizonAltitude*earth.StandardAtmosphere.Factor(obs.Height) - earth.HorizonDip(obs.Height)
+	return r.Altitude - horizon
 }
 
 // scan steps forward from t looking for f to change sign in the wanted

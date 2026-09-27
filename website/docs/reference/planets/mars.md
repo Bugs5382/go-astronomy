@@ -26,13 +26,19 @@ func Heliocentric(t time.Time) planet.HeliocentricPosition
 func NextRise(obs astronomy.Observer, t time.Time) (time.Time, bool, error)
 func NextSet(obs astronomy.Observer, t time.Time) (time.Time, bool, error)
 func NextTransit(obs astronomy.Observer, t time.Time) (time.Time, bool, error)
+
+// The Mars clock (Allison and McEwen 2000, as in Mars24).
+const Sol = 88775244147 * time.Microsecond // the mean solar day, 24h 39m 35.244s
+func SolDate(t time.Time) float64                              // Mars Sol Date
+func LocalMeanSolarTime(t time.Time, lonEastDeg float64) float64 // Mars hours, [0, 24)
 ```
 
 - `Position` returns a [`planet.Result`](../planet.md#result): topocentric geometric altitude and azimuth with the apparent diameter, the apparent RA and Dec of date, distance and light-time, magnitude, phase angle, illuminated fraction, elongation, and the `NearSun` flag. A negative altitude is below the horizon and is a valid answer.
 - `Heliocentric` is Mars seen from the Sun's centre, on the ecliptic and equinox of date; it belongs to no observer. Difference it with `planet.EarthHeliocentric` for the geometric view from Earth.
-- `NextRise` and `NextSet` are the centre crossing `planet.HorizonAltitude` (−0.5667°, standard refraction), lowered by the horizon dip for the observer's `Height` (see [Observer and height](../observer.md)). `NextTransit` is the upper culmination, whether or not Mars is up. Each reports `false` when nothing happens within 30 days.
+- `NextRise` and `NextSet` are the centre crossing `planet.HorizonAltitude` (−0.5667°, standard refraction, scaled by the air at the observer's height), lowered by the horizon dip for the observer's `Height` (see [Observer and height](../observer.md)). `NextTransit` is the upper culmination, whether or not Mars is up. Each reports `false` when nothing happens within 30 days.
 - `NearSun` is set when the elongation is under 11.5°. That is a heuristic, so the elongation and the magnitude are always reported too.
 - The observer's `Height` also enters the parallax, where it moves a planet by far less than 0.1″.
+- `SolDate` is the Mars Sol Date, the count of sols since 1873 December 29 that Mars24 and the mission clocks use (44795.9998 at 2000 January 6, 00:00 UTC). `LocalMeanSolarTime` is the local mean solar time at an east longitude, in Mars hours (a 24th of a sol). To stand on Mars and look out, see [sky](../sky.md).
 - Errors are go-apperr coded: `planet.ErrInvalidLatitude` and `planet.ErrInvalidLongitude` for an out-of-range observer, and `astronomy.ErrInvalidHeight` for a NaN or infinite height.
 
 ## 🚀 Examples

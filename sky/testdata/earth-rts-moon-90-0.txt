@@ -1,0 +1,20 @@
+# Earth rising and setting from the lunar limb at 90 E, 0 N.
+# JPL Horizons rise/transit/set: COMMAND=399 CENTER=coord@301 SITE_COORD=90,0,0
+# START=2027-01-01 STOP=2027-04-01 STEP=1 m R_T_S_ONLY=TVH APPARENT=AIRLESS (queried 2026-09-27)
+# Horizons stamps each event with the one-minute step at or after it.
+# Target body name: Earth (399)                     {source: DE441}
+# Center body name: Moon (301)                      {source: DE441}
+# Target pole/equ : ITRF93 (high precision)         {East-longitude positive}
+# Target radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}
+# Center geodetic : 90.0, 0.0, 1.06385E-13          {E-lon(deg),Lat(deg),Alt(km)}
+# Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}
+# Center radii    : 1737.4, 1737.4, 1737.4 km       {Equator_a, b, pole_c}
+# Atmos refraction: NO (AIRLESS)
+# time kind az_deg el_deg
+2027-01-08T03:23:00Z s 273.443446057 -0.899599005
+2027-01-21T10:09:00Z r 266.091046939 -1.020936800
+2027-02-04T23:00:00Z s 272.734260562 -0.901854977
+2027-02-18T16:26:00Z r 267.406085043 -1.010405453
+2027-03-04T12:27:00Z s 272.327865102 -0.904349864
+2027-03-18T04:39:00Z r 267.792320375 -0.995375942
+2027-03-31T19:20:00Z s 272.200396669 -0.904848960

@@ -199,12 +199,13 @@ func loadTVH(t *testing.T) []tvhEvent {
 }
 
 // libraryRiseSet returns the sunrise or sunset nearest to near: the start of
-// the sunrise band or the end of the sunset band on the civil day around it.
-func libraryRiseSet(t *testing.T, obs astronomy.Observer, near time.Time, rising bool) time.Time {
+// the sunrise band or the end of the sunset band on the civil day around it,
+// under the segmentation seg.
+func libraryRiseSet(t *testing.T, obs astronomy.Observer, near time.Time, rising bool, seg earth.Segmentation) time.Time {
 	t.Helper()
 	var best time.Time
 	for _, d := range []int{-1, 0, 1} {
-		day, err := earth.NewSunTimes(obs, near.AddDate(0, 0, d))
+		day, err := earth.NewSunTimesWith(obs, near.AddDate(0, 0, d), seg)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -239,12 +240,20 @@ func libraryRiseSet(t *testing.T, obs astronomy.Observer, near time.Time, rising
 // minutes, while this library uses the observed dip of the Nautical Almanac,
 // 1.76 * sqrt(h), which includes terrestrial refraction. The smaller dip rises
 // later and sets earlier, by up to about 50 s at these heights and latitudes.
+//
+// Horizons refracts with the sea-level standard air (1010 hPa, 10 C) whatever
+// the site's height, so the comparison runs in that reference air
+// (MeasuredAtmosphere(1010, 10)), which is the unscaled refraction. The
+// default standard atmosphere, which thins the refraction with height, is
+// checked in TestRefractionHeightMovesRiseAndSet and moves these events by
+// another 20 to 60 s.
 func TestRiseSetAgainstTrueVisualHorizon(t *testing.T) {
 	t.Parallel()
+	horizonsAir := earth.DefaultSegmentation.WithAtmosphere(earth.MeasuredAtmosphere(1010, 10))
 	const quantum = time.Minute
 	const slack = 5 * time.Second
 	for _, e := range loadTVH(t) {
-		got := libraryRiseSet(t, e.obs, e.when, e.rising)
+		got := libraryRiseSet(t, e.obs, e.when, e.rising, horizonsAir)
 		lo, hi := -quantum-slack, slack
 		if e.obs.Height.Meters() > 0 {
 			// The smaller, observed dip: sunrise later, sunset earlier.

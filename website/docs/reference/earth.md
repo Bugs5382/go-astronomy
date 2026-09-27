@@ -28,6 +28,12 @@ func SunTrack(obs astronomy.Observer, date time.Time, samples int) []SunSample
 - `SunPosition` returns the geometric alt/az of the Sun's disc center, paired with its apparent diameter, at instant `t`. A negative altitude is below the horizon and is a valid answer, so there is no error return.
 - `SunTrack` samples the Sun's arc across the civil day containing `date`, resolved in the observer's time zone from local midnight to the next local midnight. Exactly `samples` points are returned, evenly spaced in time and inclusive of both endpoints; the span honors daylight-saving transitions (23 or 25 hours). Fewer than two samples returns `nil`.
 
+### ⚡ Cost
+
+A single `SunPosition` evaluates VSOP87 and the nutation, about 1.6 µs. The paths that sample the Sun many times share that work across nearby instants. They compute the Sun's apparent geocentric place once per whole UTC hour and interpolate it between hours; the sidereal time, the parallax and the horizon are still computed for each instant. `NewSunTimes` and `SegmentAt` resolve a day in about 0.45 ms, and a `SunTrack` with more samples than the day has hours takes about 0.2 µs a sample.
+
+The interpolated place is within 1e-9° of `SunPosition` (a few millionths of an arc second) and exact at whole hours. A day's band boundaries move by under 0.1 s from direct positions, inside the 0.2 s the crossing search resolves. The package tests pin both limits, and the JPL Horizons rise and set fixtures pass unchanged. A `SunTrack` of 32 samples or fewer uses `SunPosition` directly.
+
 ## 🌇 Twilight bands (SunTimes)
 
 ```go
@@ -69,17 +75,21 @@ type Level struct {
 	Rising       string  // label of the band above this level while the Sun climbs
 	Setting      string  // label of the band above this level while the Sun sinks
 	DipCorrected bool    // lower this level by the horizon dip for the observer's height
+	Refracted    bool    // this level includes the 34′ horizon refraction, scaled by the air
 }
 
 type Segmentation struct {
-	Night   string   // band below the lowest level
-	Horizon float64  // altitude used for sunrise/sunset and polar detection
-	Levels  []Level  // altitude boundaries in ascending order
+	Night            string     // band below the lowest level
+	Horizon          float64    // altitude used for sunrise/sunset and polar detection
+	HorizonRefracted bool       // Horizon includes the 34′ horizon refraction
+	Levels           []Level    // altitude boundaries in ascending order
+	Atmosphere       Atmosphere // the air that scales the refraction; zero value = ISA
 }
 
 var DefaultSegmentation Segmentation
 
 func (s Segmentation) WithTwilightDip() Segmentation
+func (s Segmentation) WithAtmosphere(a Atmosphere) Segmentation
 ```
 
 A `Segmentation` divides the Sun's altitude over a civil day into named bands. `DefaultSegmentation` is the Earth default: astronomical (−18°), nautical (−12°), and civil (−6°) twilight, the sunrise/sunset horizon crossing (−0.833°, upper limb including refraction), a short sunrise/sunset band up to −0.3°, golden hour up to +6°, and full day above that. A band takes its `Rising` label while the Sun climbs through it and its `Setting` label while the Sun sinks, so a twilight band that runs past local midnight keeps one label on both dates. The day is split at solar noon, and at solar midnight when the Sun stays above the lowest level all night, so the daytime band has morning (`Rising`) and afternoon (`Setting`) halves. Treat `DefaultSegmentation` as read-only; build a fresh value to customize.
@@ -90,10 +100,11 @@ The default band labels are exported as constants: `LabelNight`, `LabelAstronomi
 
 ```go
 const HorizonAltitude = -0.833
+const HorizonRefraction = 34.0 / 60 // degrees
 func Refraction(apparentAltDeg float64) float64
 ```
 
-`Refraction` returns the atmospheric refraction, in degrees, that lifts a body seen at a given apparent altitude above its true geometric altitude, using Bennett's formula for a standard atmosphere (about 0.57° at the horizon, falling to zero near the zenith). `HorizonAltitude` (−0.833°) is the geometric center altitude at which the Sun's upper limb sits on the horizon under that refraction plus the mean solar semidiameter; it is the sunrise/sunset threshold.
+`Refraction` returns the atmospheric refraction, in degrees, that lifts a body seen at a given apparent altitude above its true geometric altitude, using Bennett's formula for sea-level air at 1010 hPa and 10 °C (about 0.57° at the horizon, falling to zero near the zenith). `HorizonAltitude` (−0.833°) is the geometric center altitude at which the Sun's upper limb sits on the horizon under the standard 34′ of horizon refraction (`HorizonRefraction`) plus the mean solar semidiameter; it is the sea-level sunrise/sunset threshold.
 
 ## ⛰️ Observer height and the horizon dip
 
@@ -102,7 +113,7 @@ const DipArcminPerRootMetre = 1.76
 func HorizonDip(h astronomy.Height) float64 // degrees
 ```
 
-`astronomy.Observer.Height` is optional; the zero value is sea level and reproduces the sea-level answers exactly. From height the sea horizon sits below the astronomical horizon by the dip, `1.76′ × √h`, so `NewSunTimes` and `SegmentAt` move sunrise earlier and sunset later: 7.3 minutes at Denver (1609 m) in June. `HorizonDip` returns the dip in degrees, and zero at or below sea level.
+`astronomy.Observer.Height` is optional; the zero value is sea level and reproduces the sea-level answers exactly. From height the sea horizon sits below the astronomical horizon by the dip, `1.76′ × √h`, so `NewSunTimes` and `SegmentAt` move sunrise earlier and sunset later: 6.8 minutes at Denver (1609 m) in June, which is 7.3 minutes of dip less half a minute because the thinner air refracts less (see the next section). `HorizonDip` returns the dip in degrees, and zero at or below sea level.
 
 ```go
 fmt.Printf("%.3f\n", earth.HorizonDip(astronomy.Meters(1609)))  // 1.177
@@ -119,6 +130,46 @@ fmt.Printf("%.3f\n", earth.HorizonDip(astronomy.Feet(36000)))   // 3.073
 | 10973 m (36000 ft) | 3.07° |
 
 By default only sunrise and sunset move. `DefaultSegmentation` marks the sunrise and sunset crossing (−0.833°) and the top of the sunrise band (−0.3°) as `DipCorrected`, and the segmentation's `Horizon` always takes the dip. The civil, nautical, and astronomical twilight levels do not: by the USNO convention, they are the Sun's depression below the astronomical horizon. `WithTwilightDip` returns a copy with every level dip-corrected; at Denver in March it moves civil dawn 6.1 minutes earlier. A NaN or infinite height is rejected with `astronomy.ErrInvalidHeight`. See [Observer and height](./observer.md) for the three ways to set a height, the resolvers, and a moving-observer example.
+
+## 🎈 Refraction and height
+
+```go
+type Atmosphere struct{ /* unexported */ }
+var StandardAtmosphere Atmosphere // the zero value: the ISA at the observer's height
+func MeasuredAtmosphere(pressureHPa, temperatureC float64) Atmosphere
+
+func (a Atmosphere) Factor(h astronomy.Height) float64
+func (a Atmosphere) Refraction(apparentAltDeg float64, h astronomy.Height) float64
+func (a Atmosphere) Measured() (pressureHPa, temperatureC float64, ok bool)
+func (a Atmosphere) Err() error // ErrInvalidAtmosphere for air that cannot exist
+
+func HorizonAltitudeAt(h astronomy.Height) float64 // the Sun's rise/set altitude at height
+
+var ErrInvalidAtmosphere error // code 7017, CodeInvalidAtmosphere
+```
+
+The dip and the refraction change together with height, in opposite directions. The dip lowers the horizon: it is the Nautical Almanac's observed dip, so it already includes the bending of the line of sight down to the sea horizon. The refraction that lifts the body itself scales with the density of the air, and the air above sea level is thinner, so a body on the horizon is lifted less and the horizon threshold rises by the refraction lost.
+
+`StandardAtmosphere.Factor(h)` is the ISA density ratio `P(h)/P₀ × T₀/T(h)`: exactly 1 at sea level, so every sea-level answer is unchanged, above 1 below sea level, and following the ISA layers to 84.9 km (it holds well past 15 km). `MeasuredAtmosphere(p, t)` uses a local reading of station pressure in hPa and temperature in °C instead, with the absolute factor `P/1010 × 283/(273+T)`, whatever the height; use the station pressure, not the sea-level pressure most weather reports give. Air that cannot exist (a pressure that is not positive, a temperature at or below −273 °C, NaN) is rejected with `ErrInvalidAtmosphere` by `NewSunTimesWith` and `SegmentAtWith`.
+
+| height | dip | factor | refraction lost | `HorizonAltitudeAt` |
+| --- | --- | --- | --- | --- |
+| sea level | 0° | 1.000 | 0° | −0.833° |
+| 1524 m (5000 ft) | 1.145° | 0.862 | 0.078° | −1.900° |
+| 1609 m (Denver) | 1.177° | 0.854 | 0.082° | −1.927° |
+| 3640 m (La Paz) | 1.770° | 0.695 | 0.173° | −2.430° |
+| 10668 m (35000 ft) | 3.030° | 0.311 | 0.391° | −3.472° |
+| 15000 m | 3.593° | 0.159 | 0.477° | −3.949° |
+
+`HorizonAltitudeAt(h)` is `HorizonAltitude + (1 − factor) × HorizonRefraction − HorizonDip(h)` in the standard atmosphere. The segmentation applies the same correction to the `Horizon` (when `HorizonRefracted`) and to every `Refracted` level; `DefaultSegmentation` marks the sunrise crossing and the top of the sunrise band, the two levels that take the dip, and leaves the twilight levels, which are geometric depressions with no refraction in them. `WithAtmosphere` swaps in measured air:
+
+```go
+cold := earth.MeasuredAtmosphere(845, -15) // a cold winter morning in Denver
+day, err := earth.NewSunTimesWith(obs, date, earth.DefaultSegmentation.WithAtmosphere(cold))
+// standard air factor 0.854, measured air factor 0.918: sunrise 13 s earlier
+```
+
+Every height-aware call uses the standard atmosphere by default: `NewSunTimes`, `SegmentAt`, the Moon's `NextRise`, `NextSet`, and `ApparentPosition`, and every planet's `NextRise` and `NextSet`. Measured air goes through the segmentation (`WithAtmosphere`) or directly through `Atmosphere.Refraction` for a single altitude; the Moon and planet rise and set searches take the standard atmosphere only. JPL Horizons refracts with the sea-level air at any height, so to compare with it use `MeasuredAtmosphere(1010, 10)`, whose factor is exactly 1.
 
 ## ❄️ Polar states
 

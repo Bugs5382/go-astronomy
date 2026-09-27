@@ -65,6 +65,7 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 - 🌇 **Earth twilight bands** — `earth.NewSunTimes` resolves one civil day in the observer's timezone with Earth refraction (−0.833° upper limb, Bennett): astronomical/nautical/civil dawn, sunrise, golden hour, day split at solar noon, golden hour, sunset, and the matching dusk bands. Each band is `{from, to, seconds}`.
 - 🌗 **Moon (Luna)** — `earth/moon` position and apparent position, next rise/set, the eight named phases, `Age`, `Illumination`, `PhaseAngle`, next new/full, and `Track`. `PhaseAt` names the phase from the Moon's elongation from the Sun rather than from its age, so the name follows the sky rather than a mean cycle length. `BrightLimbAt` says which way the lit side faces, from celestial north and from "up" on the observer's screen. Blue-moon detection is **(roadmap)**. The Moon belongs to Earth; other bodies own their own moons.
 - 🪐 **Planets** — one package per planet, `planet/mercury` to `planet/neptune`, each with its own VSOP87 table and the same API: topocentric apparent position (light-time, aberration, nutation), apparent diameter, phase, magnitude (Mallama and Hilton 2018), elongation with a near-Sun flag, rise, set, and transit, and the observer-independent heliocentric position. Importing one planet links only its table; `planet/all` iterates over them all. Positions match JPL Horizons to about 1″ (2″ for Uranus and Neptune).
+- 🔭 **Other worlds** — the `sky` package stands the observer on the Moon, Mars, or any planet and resolves any other body from there, with that body's IAU rotation, shape, refraction, and twilight: Earth from Mars, the Sun from the Moon. Rise, set, and transit follow the body's own day, and a target that never crosses the horizon says so (`AlwaysAbove`: Earth from the lunar near side). It matches JPL Horizons to under half an arc second from Mars.
 - 🛰️ **Satellites** — the `satellite` package propagates a caller-supplied TLE or CCSDS OMM (JSON or XML) with SGP4/SDP4, ported from the Vallado et al. reference code, and gives altitude, azimuth, range, sunlight, and magnitude, plus passes with rise, peak, set, visibility, and shadow entry and exit. It never fetches element sets; `Elements.Age` tells a caller how stale one is.
 - ⭐ **Stars** — an embedded HYG-derived named-star catalog with RA/Dec, **distance**, proper motion, and radial velocity. `Star.PositionAt` carries a star along its space motion, and `earth.StarPosition` gives its apparent alt/az for the observer and instant, matching the IAU SOFA library to about 0.1″.
 - 🌌 **Constellations** — `constellation.FindAt` looks up the constellation containing an RA/Dec over the IAU (Delporte/Roman) default dataset, with `List` and `Lookup` alongside it. The lookup machinery is universal; the dataset is consumer-overridable.
@@ -216,9 +217,31 @@ x, y := -math.Sin(a), -math.Cos(a) // screen vector toward the lit side (x right
 
 The angle points at the Sun even below the horizon, because both bodies use their topocentric apparent places. Near New and Full Moon (under about 0.1% or over 99.9% lit) there is no visible bright limb to orient, and the angle should be treated as undefined. Against JPL Horizons DE441 (`PsAng`) the position angle agrees to within 0.01°.
 
+## 🔭 Other worlds
+
+`sky` is the general form of the Earth observer. A `sky.Site` stands on a `sky.Body` (`sky.Sun`, `sky.Earth`, `sky.Moon`, or any planet through `sky.Planet(mars.Planet)`, which links only that planet's table), and `sky.Position` resolves any other body from it. Everything that made the sky Earth-only is a property of the body: its IAU WGCCRE 2015 pole and prime meridian, its reference ellipsoid, its refraction (34′ on Earth, zero on the airless Moon), and its twilight (Earth's bands, none elsewhere).
+
+```go
+moonSite := sky.Site{Body: sky.Moon, Lat: 0, Lon: 0}
+earth, _ := sky.Position(moonSite, sky.Earth, when) // altitude 80.6, 62% lit on 2027-01-01
+rise, _ := sky.NextRise(moonSite, sky.Earth, when)  // rise.State == sky.AlwaysAbove
+
+m, _ := sky.Planet(mars.Planet)
+jezero := sky.Site{Body: m, Lat: 18.44, Lon: 77.45}
+sunrise, _ := sky.NextRise(jezero, sky.Sun, when) // 18:38:12 UTC on 2027-01-01
+lmst := mars.LocalMeanSolarTime(sunrise.Time, jezero.Lon) // 5.75 Mars hours
+```
+
+- 🌍 **Earth is the special case.** A site on Earth answers through `earth`, `earth/moon`, and the planet packages, so it gives exactly their numbers.
+- 🌗 **Phases everywhere.** Every result carries the phase angle and lit fraction: Earth from the Moon is the complement of the Moon from Earth.
+- 🌑 **No twilight without air.** `sky.Segments` divides the lunar day at sunrise and sunset only, into days and nights of about two weeks.
+- 🎯 **Accuracy.** Against JPL Horizons the direction agrees to under 0.4″ from Mars and Venus and to about 11″ from the Moon, where the IAU lunar model approximates the mean Earth frame Horizons uses. Rise and set fall inside Horizons' one-minute step from Mars.
+
+Times are `time.Time` in UTC: a `Site` has no time zone. Mars keeps its own clock in `planet/mars` (`SolDate`, `LocalMeanSolarTime`, `Sol`).
+
 ## ⛰️ Observer height
 
-An `Observer`'s height above sea level is optional. From height the sea horizon lies below the astronomical horizon by the dip, so the Sun, the Moon, and the planets rise earlier and set later (7.3 minutes at Denver's 1609 m in June), and the height enters their parallax. There are three ways to give an observer its height.
+An `Observer`'s height above sea level is optional. From height the sea horizon lies below the astronomical horizon by the dip, so the Sun, the Moon, and the planets rise earlier and set later, and the height enters their parallax. The air up there is thinner, so it refracts less and gives a little of that back: at Denver's 1609 m in June sunrise comes 6.8 minutes earlier, 7.3 for the dip less half a minute for the refraction (see Dip and refraction below). There are three ways to give an observer its height.
 
 ### Always sea level
 
@@ -234,7 +257,7 @@ Set `Height` with `astronomy.Feet` or `astronomy.Meters` (1 ft = 0.3048 m exactl
 
 ```go
 obs := astronomy.Observer{Lat: 40.71, Lng: -74.01, TZ: tz, Height: astronomy.Feet(5000)} // same as Meters(1524)
-day, err := earth.NewSunTimes(obs, date) // sunrise 7.2 minutes earlier than at sea level
+day, err := earth.NewSunTimes(obs, date) // sunrise 6.7 minutes earlier than at sea level
 ```
 
 Only NaN and the infinities are invalid: every function that returns an error rejects them with `astronomy.ErrInvalidHeight` (code 7011), and `Height.Err()` checks one up front.
@@ -260,16 +283,38 @@ The `openmeteo` resolver respects `ctx`, bounds each lookup with a default 10 s 
 
 ### Moving observers
 
-A caller in motion, such as a plane, passes the position and height for each instant to each time-based call. `Example_flightNYCToLondon` follows a JFK to Heathrow flight at 36000 ft: at 04:54 UTC over the Atlantic the Sun is up for the plane (-2.43°, above its dipped horizon of -3.91°) but not yet for the ocean below.
+A caller in motion, such as a plane, passes the position and height for each instant to each time-based call. `Example_flightNYCToLondon` follows a JFK to Heathrow flight at 36000 ft: at 04:54 UTC over the Atlantic the Sun is up for the plane (-2.43°, above its horizon of -3.51°) but not yet for the ocean below.
 
 ```go
 for _, f := range []float64{0, 0.25, 0.5, 0.7, 0.75, 1} {
 	lat, lng := greatCircle(jfk, lhr, f) // the point f of the way along the route
 	obs := astronomy.Observer{Lat: lat, Lng: lng, Height: astronomy.Feet(36000)}
 	sun := earth.SunPosition(obs, depart.Add(time.Duration(f*float64(7*time.Hour))))
-	up := sun.Altitude > earth.HorizonAltitude-earth.HorizonDip(obs.Height)
+	up := sun.Altitude > earth.HorizonAltitudeAt(obs.Height) // dip and thinner air
 	_ = up
 }
+```
+
+### 🌫️ Dip and refraction
+
+Two things move the horizon for an observer above sea level, and they pull in opposite directions:
+
+- 📉 **The dip lowers it.** The sea horizon lies `1.76′ × √h` below the astronomical horizon (`earth.HorizonDip`, the Nautical Almanac value, which already includes the bending of the line of sight down to the sea).
+- 📈 **Thinner air raises it back a little.** The 34′ of refraction that lifts a body on the horizon scales with the density of the air. By default the library takes the air at the observer's height from the ISA standard atmosphere (`earth.StandardAtmosphere`): its factor is exactly 1 at sea level, so sea-level answers do not change, and it follows the ISA layers well past 15 km.
+
+| height | dip | refraction factor | Sun's centre at sunrise |
+| --- | --- | --- | --- |
+| sea level | 0° | 1.000 | −0.833° |
+| 1524 m (5000 ft) | 1.145° | 0.862 | −1.900° |
+| 1609 m (Denver) | 1.177° | 0.854 | −1.927° |
+| 10668 m (35000 ft) | 3.030° | 0.311 | −3.472° |
+
+`earth.HorizonAltitudeAt(h)` gives the last column. The Sun, the Moon's and the planets' rise and set, and the Moon's `ApparentPosition` all use the scaled refraction. With a local reading of station pressure and temperature, pass the measured air instead: it applies the absolute factor `P/1010 × 283/(273+T)`.
+
+```go
+cold := earth.MeasuredAtmosphere(845, -15) // hPa, °C, at the observer
+day, err := earth.NewSunTimesWith(obs, date, earth.DefaultSegmentation.WithAtmosphere(cold))
+r := cold.Refraction(apparentAlt, obs.Height) // degrees, for any altitude
 ```
 
 ## 📋 Requirements
@@ -306,6 +351,10 @@ flowchart TD
     APP --> CONST
     APP --> EARTH
     APP --> MOON
+    APP --> SKY["sky<br/>any body from any body"]
+    SKY --> EARTH
+    SKY --> MOON
+    SKY --> EPH
 
     EARTH --> SUN
     MOON --> COORD
@@ -320,7 +369,7 @@ flowchart TD
     MOON --> EPH
 ```
 
-Adding a future body (for example, `mars/` with its own moons and `SunTimes` equivalent) requires no change to `sun`.
+Other vantages go through `sky`, which takes each body's rotation, shape, refraction, and twilight as data, so a new body needs its IAU elements and a position, and no change to `sun` or `earth`.
 
 ## 🛠️ Working in the repo
 
