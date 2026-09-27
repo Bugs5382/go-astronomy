@@ -160,14 +160,10 @@ func New(opts ...Option) *Resolver {
 		o(r)
 	}
 	if r.log == nil {
-		r.log = defaultLogger()
+		r.log = log.NewLogger("go-astronomy")
 	}
 	return r
 }
-
-// defaultLogger is built once: go-log's constructor sets package-level state,
-// so building one per Resolver from several goroutines would race.
-var defaultLogger = sync.OnceValue(func() log.Logger { return log.NewLogger("go-astronomy") })
 
 var defaultResolver = sync.OnceValue(func() *Resolver { return New() })
 

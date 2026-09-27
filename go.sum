@@ -1,7 +1,7 @@
 github.com/Bugs5382/go-apperr v1.0.0 h1:YfepdvZm+ctIt5DDJ9XVbwPRk+lo9aE95btYqaSf084=
 github.com/Bugs5382/go-apperr v1.0.0/go.mod h1:4kzGmhaC5tcPDskwAi8HIRDKSkMrJdvOUxik9Uuij1k=
-github.com/Bugs5382/go-log v1.2.0 h1:kebzXxMtygnO/ScKWbUVynBSm+TG7cVzEeutm12kqS4=
-github.com/Bugs5382/go-log v1.2.0/go.mod h1:OGgIWWKKNg2AXVJlbVJZb/s8dnqqsrKwWznYXik547E=
+github.com/Bugs5382/go-log v1.2.2 h1:803glsSyES6lNdvx4vbMYo6ur0KZBPiIatilvIqJfLc=
+github.com/Bugs5382/go-log v1.2.2/go.mod h1:OGgIWWKKNg2AXVJlbVJZb/s8dnqqsrKwWznYXik547E=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

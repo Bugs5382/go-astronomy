@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -217,4 +218,24 @@ func TestResolveObserverWithOpenMeteo(t *testing.T) {
 	if err != nil || src != astronomy.SourceOpenMeteo || obs.Height != astronomy.Meters(1597) || obs.Lat != 39.74 {
 		t.Errorf("observer %+v %q %v", obs, src, err)
 	}
+}
+
+// TestConcurrentNew builds resolvers from many goroutines at once, each with
+// its own default logger. Under the race detector this needs go-log v1.2.1 or
+// later, where the base logger is stored atomically (Bugs5382/go-log issue 5).
+func TestConcurrentNew(t *testing.T) {
+	t.Parallel()
+	f := newFake(t, http.StatusOK, `{"elevation":[1.0]}`, 0)
+	var wg sync.WaitGroup
+	for range 16 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			r := openmeteo.New(openmeteo.WithBaseURL(f.srv.URL))
+			if _, _, err := r.Elevation(context.Background(), 1, 1); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
 }
