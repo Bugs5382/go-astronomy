@@ -50,6 +50,22 @@ Elements, and the apparent magnitude formulas of Mallama and Hilton:
     The Astronomical Almanac", Astronomy and Computing, 25, 10.
 
 --------------------------------------------------------------------------------
+SGP4/SDP4 satellite propagation (satellite/sgp4.go)
+--------------------------------------------------------------------------------
+The satellite propagator is a port of the reference implementation published
+with Vallado, Crawford, Hujsak and Kelso (2006), which its authors released to
+the public domain, made by way of its Python transliteration in python-sgp4.
+The verification set in satellite/testdata (SGP4-VER.TLE, tcppver.out) is the
+one distributed with that reference code. The sample OMM messages are the ones
+python-sgp4 ships.
+
+  Vallado, D. A., Crawford, P., Hujsak, R., Kelso, T. S. 2006, "Revisiting
+    Spacetrack Report #3", AIAA 2006-6753.
+  python-sgp4, Copyright (c) 2012-2016 Brandon Rhodes
+  https://github.com/brandon-rhodes/python-sgp4
+  License: MIT
+
+--------------------------------------------------------------------------------
 Elevation data (fetched at run time by the optional openmeteo package)
 --------------------------------------------------------------------------------
 The openmeteo package asks the Open-Meteo elevation API for an observer's

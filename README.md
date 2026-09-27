@@ -65,6 +65,7 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 - 🌇 **Earth twilight bands** — `earth.NewSunTimes` resolves one civil day in the observer's timezone with Earth refraction (−0.833° upper limb, Bennett): astronomical/nautical/civil dawn, sunrise, golden hour, day split at solar noon, golden hour, sunset, and the matching dusk bands. Each band is `{from, to, seconds}`.
 - 🌗 **Moon (Luna)** — `earth/moon` position and apparent position, next rise/set, the eight named phases, `Age`, `Illumination`, `PhaseAngle`, next new/full, and `Track`. `PhaseAt` names the phase from the Moon's elongation from the Sun rather than from its age, so the name follows the sky rather than a mean cycle length. `BrightLimbAt` says which way the lit side faces, from celestial north and from "up" on the observer's screen. Blue-moon detection is **(roadmap)**. The Moon belongs to Earth; other bodies own their own moons.
 - 🪐 **Planets** — one package per planet, `planet/mercury` to `planet/neptune`, each with its own VSOP87 table and the same API: topocentric apparent position (light-time, aberration, nutation), apparent diameter, phase, magnitude (Mallama and Hilton 2018), elongation with a near-Sun flag, rise, set, and transit, and the observer-independent heliocentric position. Importing one planet links only its table; `planet/all` iterates over them all. Positions match JPL Horizons to about 1″ (2″ for Uranus and Neptune).
+- 🛰️ **Satellites** — the `satellite` package propagates a caller-supplied TLE or CCSDS OMM (JSON or XML) with SGP4/SDP4, ported from the Vallado et al. reference code, and gives altitude, azimuth, range, sunlight, and magnitude, plus passes with rise, peak, set, visibility, and shadow entry and exit. It never fetches element sets; `Elements.Age` tells a caller how stale one is.
 - ⭐ **Stars** — an embedded HYG-derived named-star catalog with RA/Dec **and distance**, projected to alt/az for the observer and instant.
 - 🌌 **Constellations** — `constellation.FindAt` looks up the constellation containing an RA/Dec over the IAU (Delporte/Roman) default dataset, with `List` and `Lookup` alongside it. The lookup machinery is universal; the dataset is consumer-overridable.
 - 📐 **Discs, not points** — Sun and Moon positions are the **center of the disc**, always paired with **angular diameter**, so a consumer can size the disc and compute alignment/overlap (eclipses, occultations) purely from the data.
@@ -126,6 +127,69 @@ p, ok := all.ByName("saturn")
 ### Accuracy
 
 Against JPL Horizons DE441 (2020 to 2030, plus two conjunctions), the apparent place is within 0.3″ for Mercury, Venus, and Mars, 0.6″ for Jupiter and Saturn, and 1.7″ for Uranus and Neptune. Magnitudes agree to 0.08, and rise, set, and transit fall within Horizons' one-minute step. See the [planets overview](./website/docs/reference/planet.md) for the shared types, VSOP87 coverage, frames, and units, and one page per planet under [`website/docs/reference/planets/`](./website/docs/reference/planets/).
+
+## 🛰️ Satellites
+
+The `satellite` package is the engine: TLE and CCSDS OMM parsing, SGP4/SDP4, look angles, sunlight, magnitude, and passes. The named packages fix one object each: `satellite/iss`, `satellite/hubble`, and `satellite/tiangong` in Earth orbit, and `satellite/jwst` and `satellite/roman` out at the Sun-Earth L2 point. Nothing is fetched implicitly: element sets and ephemerides come from a source the caller passes in, either its own or the explicit fetchers `satellite/celestrak` and `satellite/horizons`.
+
+### ISS passes and position
+
+```go
+import (
+	"github.com/Bugs5382/go-astronomy/satellite"
+	"github.com/Bugs5382/go-astronomy/satellite/celestrak"
+	"github.com/Bugs5382/go-astronomy/satellite/iss"
+)
+
+tracker := iss.New(celestrak.New())   // or iss.New(satellite.StaticElements(myElements))
+denver := astronomy.Observer{Lat: 39.74, Lng: -104.99}
+
+passes, err := tracker.Passes(ctx, denver, now, now.Add(24*time.Hour))
+for _, p := range passes {
+	// p.Rise, p.Peak, p.Set; p.Visible (sunlit while you are in darkness);
+	// p.ShadowEntry, where it vanishes into the Earth's shadow; p.Peak.Magnitude
+}
+l, err := tracker.Position(ctx, denver, now) // l.Altitude, l.Azimuth, l.RangeKm, l.Sunlit
+```
+
+### Fetching, rarely
+
+- **`celestrak`** caches each element set by catalogue number and never makes a caller wait once it has one: every call answers from the cache, and a set older than 3 days is refreshed in the background (one refresh per satellite, never sooner than every 2 hours, following CelesTrak's guidance; a failed refresh keeps the old set). `celestrak.NeverExpire()` fetches once and never refreshes. Every position and pass is propagated locally, and `ElementEpoch` on each result says how old the set behind it is.
+- **`horizons`** fetches a 30-day table at a one-hour step in one request, caches it, and interpolates locally (eight-point Lagrange, within 4.4 milliarcseconds of a ten-minute table). It refetches only when an instant leaves the window.
+- **Shared behaviour.** Both take `ctx`, have a default timeout, accept an injected `*http.Client`, and use a pluggable `satellite.Cache`.
+- **What is cached.** CelesTrak sets are cached by catalogue number only, never per observer or time, so one daily fetch serves every observer at every time; positions and passes are always propagated locally.
+- **Restarts and replicas.** The default in-memory cache is lost on restart. To keep sets across restarts and share them between replicas, implement the two-method `satellite.Cache` over Redis in your own code (go-astronomy has no Redis dependency):
+
+```go
+// RedisCache adapts a go-redis client to satellite.Cache. It lives in your
+// code; go-astronomy has no Redis dependency.
+type RedisCache struct{ R *redis.Client }
+
+func (c RedisCache) Get(ctx context.Context, key string) ([]byte, bool, error) {
+	b, err := c.R.Get(ctx, key).Bytes()
+	if errors.Is(err, redis.Nil) {
+		return nil, false, nil
+	}
+	return b, err == nil, err
+}
+
+func (c RedisCache) Set(ctx context.Context, key string, v []byte, expiry time.Duration) error {
+	return c.R.Set(ctx, key, v, expiry).Err() // an expiry of 0 keeps it
+}
+
+elements := celestrak.New(celestrak.WithCache(RedisCache{R: rdb}))
+tracker := iss.New(elements)
+```
+
+- **Drift.** A set's error grows with age. For the ISS it is about a kilometre when fresh and a few kilometres after a few days. It reaches tens to hundreds of kilometres after about a week, and can be far off after a month or an ISS reboost. The default 3-day background refresh keeps it within a few kilometres, well under a second of pass timing. With `NeverExpire`, a set too old for SGP4 gives an error, never a wrong position.
+
+### Why JWST and Roman have no Passes
+
+At L2, 1.2 to 1.8 million km out, SGP4 and element sets do not apply, so their ephemerides come from JPL Horizons. The telescopes drift about a degree a day near the anti-Sun point and rise and set once a day like faint stars, so they expose `Position` only. Roman launched on 2026-08-30. Horizons has its predicted trajectory only through its latest published file, and an instant past it is an error, not an extrapolation.
+
+### Accuracy
+
+The SGP4 port matches the reference verification output to under 0.1 m. Against Skyfield on the same element set, passes agree to 0.2 s and shadow crossings to 0.05 s. The real limit is the element set's age (`Elements.Age`). See the [satellite reference](./website/docs/reference/satellite.md) and the per-package pages under [`website/docs/reference/satellites/`](./website/docs/reference/satellites/).
 
 ## 🌓 Which way the Moon is lit
 

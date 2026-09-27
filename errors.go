@@ -72,6 +72,15 @@ const (
 	CodeXModeNotAzimuth = 7010
 	// CodeInvalidHeight marks an observer Height that is NaN or infinite.
 	CodeInvalidHeight = 7011
+	// CodeInvalidElements marks a satellite element set (TLE or OMM) that
+	// could not be parsed.
+	CodeInvalidElements = 7014
+	// CodeSatellitePropagation marks an element set SGP4 could not propagate
+	// to the requested instant, such as a satellite that has decayed.
+	CodeSatellitePropagation = 7015
+	// CodeInvalidPassWindow marks a pass search whose end is not after its
+	// start, or which spans more than 31 days.
+	CodeInvalidPassWindow = 7016
 )
 
 // errorEntries is the module's code table. It feeds the go-apperr registry that
@@ -88,6 +97,9 @@ var errorEntries = []apperr.Entry{
 	{Code: CodeInvalidElevationScale, Title: "projection", Cause: "geometric elevation degrees-per-pixel not positive"},
 	{Code: CodeXModeNotAzimuth, Title: "projection", Cause: "column-to-azimuth query on a non-azimuth horizontal mode"},
 	{Code: CodeInvalidHeight, Title: "observer", Cause: "observer height is NaN or infinite"},
+	{Code: CodeInvalidElements, Title: "satellite", Cause: "satellite element set could not be parsed"},
+	{Code: CodeSatellitePropagation, Title: "satellite", Cause: "SGP4 could not propagate the element set to the instant"},
+	{Code: CodeInvalidPassWindow, Title: "satellite", Cause: "pass window end not after start, or longer than 31 days"},
 }
 
 // logSink adapts a go-log Logger to the go-apperr Logger interface. It is the

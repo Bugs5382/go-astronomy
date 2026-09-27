@@ -56,6 +56,10 @@ At high latitudes the Sun may not cross the horizon on a given day. That is an e
 
 A planet's position is computed in two steps, and the first is published on its own. Each planet package's `Heliocentric` (for example `mars.Heliocentric`) gives the planet seen from the Sun's centre, a vector that does not depend on anyone; its `Position` then reduces it to one observer on Earth, with light-time, aberration, nutation, and the topocentric correction. Keeping the first step public is what lets an observer on another body be built later: Earth seen from Mars is the difference of two heliocentric vectors, just as Mars seen from Earth is.
 
+## 🛰️ Satellites take an element set
+
+Everything else in the library is a pure function of an observer and an instant. An Earth satellite is not: its position comes from an orbital element set that is measured and goes stale. So `satellite` takes the element set as an input, propagates it with SGP4 (the model it was fitted against), and never fetches one. `Elements.Age` tells a caller how old the answer's basis is, and passes are intervals because a satellite crosses the sky in minutes.
+
 ## ⛰️ Height and the horizon
 
 An observer's height moves the horizon, not the sky. From height the sea horizon sits below the astronomical horizon by the dip, so rise and set move while positions barely change (the height shifts the Sun's and Moon's parallax by under an arc second). The height is optional: leave it out for sea level and no network, set it by hand in feet or metres, or look it up with a resolver. The calculation functions never look anything up. A moving observer, such as a plane, passes its position and height for each instant. See [Observer and height](./reference/observer.md).

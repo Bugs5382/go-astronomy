@@ -35,6 +35,11 @@ Module path: `github.com/Bugs5382/go-astronomy`
 | `github.com/Bugs5382/go-astronomy/planet` | universal | Shared planet types only: `Result`, `HeliocentricPosition` (`Vector`), `EarthHeliocentric`, the `Body` interface, `HorizonAltitude`, and the observer errors. No tables. |
 | `github.com/Bugs5382/go-astronomy/planet/<name>` | universal | One package per planet (`mercury`, `venus`, `mars`, `jupiter`, `saturn`, `uranus`, `neptune`), each with only its own VSOP87 table: `Position(obs, t)`, `Heliocentric(t)`, `NextRise`/`NextSet`/`NextTransit`, `Name`, `RadiusKm`, `NearSunElongation`, and `Planet` (a `planet.Body`). |
 | `github.com/Bugs5382/go-astronomy/planet/all` | optional | `Planets()` and `ByName(name)` over every planet; importing it links every table. |
+| `github.com/Bugs5382/go-astronomy/satellite` | Earth satellites | Engine: `ParseTLE`/`ParseOMM`, SGP4/SDP4 `Propagate`, `Position(obs, elements, t)`, `Passes`, `Look.Magnitude`; `Tracker`, `ElementSource`/`StaticElements`, and the pluggable `Cache`. No network. |
+| `github.com/Bugs5382/go-astronomy/satellite/{iss,hubble,tiangong}` | named satellites | `New(src)` returns a `satellite.Tracker` for NORAD 25544, 20580, and 48274: `Position(ctx, obs, t)`, `Passes(ctx, obs, from, to)`. |
+| `github.com/Bugs5382/go-astronomy/satellite/celestrak` | explicit fetcher | CelesTrak GP element sets, cached per catalogue number: answers never wait once cached, a background refresh after 3 days (at most every 2 h), or `NeverExpire()`. |
+| `github.com/Bugs5382/go-astronomy/satellite/horizons` | explicit fetcher | JPL Horizons tables over a window (30 days at 1 h), cached and interpolated locally; `NewTracker`. |
+| `github.com/Bugs5382/go-astronomy/satellite/{jwst,roman}` | L2 telescopes | `New(horizons.Client)`: `Position` only (no SGP4 or passes at L2). |
 | `github.com/Bugs5382/go-astronomy/openmeteo` | optional adapter | `astronomy.ElevationResolver` backed by the Open-Meteo elevation API (`New`, `ResolveObserver`, in-process cache, go-log logging). The only package that reaches the network. |
 | `github.com/Bugs5382/go-astronomy/internal/...` | internal | Math core (`angles`, `julian`, `coordinates`, `ephemeris`, `project`). Unexported by policy — do not import. |
 

@@ -1,6 +1,8 @@
 /bin/
 *.test
 *.out
+# the SGP4 reference verification output is test data
+!satellite/testdata/tcppver.out
 coverage.*
 
 # local design notes - never committed
