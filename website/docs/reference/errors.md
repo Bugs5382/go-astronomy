@@ -27,6 +27,9 @@ The codes are part of the public contract: a code is never renumbered, only adde
 | 7008 | `CodeInvalidFieldOfView` | Azimuth field of view or arc span not positive. |
 | 7009 | `CodeInvalidElevationScale` | `Geometric` elevation degrees-per-pixel not positive. |
 | 7010 | `CodeXModeNotAzimuth` | Column-to-azimuth query on a non-azimuth horizontal mode. |
+| 7014 | `CodeInvalidElements` | Satellite element set (TLE or OMM) that could not be parsed. |
+| 7015 | `CodeSatellitePropagation` | SGP4 could not propagate the element set to the instant (for example, a decayed satellite). |
+| 7016 | `CodeInvalidPassWindow` | Pass window end not after start, or longer than 31 days. |
 
 These constants are declared on the root `astronomy` package.
 
@@ -36,6 +39,7 @@ Each error-returning package also exports named sentinels you can match with `er
 
 - `earth.ErrInvalidLatitude`, `earth.ErrInvalidLongitude`, `earth.ErrInvalidSegmentation`
 - `star.ErrEmptyMagnitudeRange`
+- `satellite.ErrMalformedTLE`, `satellite.ErrChecksum`, `satellite.ErrMalformedOMM`, `satellite.ErrDecayed` (and the other propagation sentinels), `satellite.ErrInvalidPassWindow`, `satellite.ErrInvalidLatitude`, `satellite.ErrInvalidLongitude`
 - `project.ErrInvalidCanvas`, `project.ErrInvalidHorizonFraction`, `project.ErrInvalidPeakAltitude`, `project.ErrInvalidFieldOfView`, `project.ErrInvalidElevationScale`, `project.ErrXModeNotAzimuth`
 
 ```go
