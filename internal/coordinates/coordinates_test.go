@@ -220,3 +220,31 @@ func TestPrecessEquatorialMeeusExample(t *testing.T) {
 			got.Dec, wantDec, (got.Dec-wantDec)*3600)
 	}
 }
+
+// TestPositionAngleMeeusExample anchors PositionAngle to Meeus, Astronomical
+// Algorithms, example 48.a (1992 April 12, 0h TD): with the Sun at
+// RA 20.6579, Dec +8.6964 and the Moon at RA 134.6885, Dec +13.7684, the
+// position angle of the Moon's bright limb is 285.0 degrees.
+func TestPositionAngleMeeusExample(t *testing.T) {
+	t.Parallel()
+	if got := PositionAngle(20.6579, 8.6964, 134.6885, 13.7684); math.Abs(got-285.0) > 0.05 {
+		t.Errorf("PositionAngle = %.3f, want 285.0", got)
+	}
+}
+
+// TestPositionAngleCardinal checks the convention on simple cases: a point
+// due north is at 0, due east (greater right ascension) at 90, due south at
+// 180, and due west at 270.
+func TestPositionAngleCardinal(t *testing.T) {
+	t.Parallel()
+	cases := []struct{ ra0, dec0, want float64 }{
+		{100, 11, 0}, {101, 10, 90}, {100, 9, 180}, {99, 10, 270},
+	}
+	for _, c := range cases {
+		got := PositionAngle(c.ra0, c.dec0, 100, 10)
+		d := math.Mod(got-c.want+540, 360) - 180
+		if math.Abs(d) > 0.5 {
+			t.Errorf("PositionAngle(%v, %v) = %.3f, want %v", c.ra0, c.dec0, got, c.want)
+		}
+	}
+}

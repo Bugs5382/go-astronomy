@@ -63,7 +63,7 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 - ☀️ **Universal Sun physics** — `sun.ApparentDiameter` / `sun.ApparentSemidiameter` give the Sun's apparent angular size for any distance in AU, from the semidiameter-at-1-AU constant. This is the only observer-independent part of the Sun, so any vantage body reuses it with its own distance.
 - 🌅 **Earth vantage on the Sun** — `earth.SunPosition` (geometric alt/az of the disc center, paired with apparent diameter) and `earth.SunTrack` (arc samples of `{Time, Altitude, Azimuth, TimeProgress}`). The alt/az, sidereal time, and Earth-Sun distance are all Earth-specific, so they live with the Earth vantage rather than in `sun`.
 - 🌇 **Earth twilight bands** — `earth.NewSunTimes` resolves one civil day in the observer's timezone with Earth refraction (−0.833° upper limb, Bennett): astronomical/nautical/civil dawn, sunrise, golden hour, day split at solar noon, golden hour, sunset, and the matching dusk bands. Each band is `{from, to, seconds}`.
-- 🌗 **Moon (Luna)** — `earth/moon` position and apparent position, next rise/set, the eight named phases, `Age`, `Illumination`, `PhaseAngle`, next new/full, and `Track`. `PhaseAt` names the phase from the Moon's elongation from the Sun rather than from its age, so the name follows the sky rather than a mean cycle length. Blue-moon detection is **(roadmap)**. The Moon belongs to Earth; other bodies own their own moons.
+- 🌗 **Moon (Luna)** — `earth/moon` position and apparent position, next rise/set, the eight named phases, `Age`, `Illumination`, `PhaseAngle`, next new/full, and `Track`. `PhaseAt` names the phase from the Moon's elongation from the Sun rather than from its age, so the name follows the sky rather than a mean cycle length. `BrightLimbAt` says which way the lit side faces, from celestial north and from "up" on the observer's screen. Blue-moon detection is **(roadmap)**. The Moon belongs to Earth; other bodies own their own moons.
 - ⭐ **Stars** — an embedded HYG-derived named-star catalog with RA/Dec **and distance**, projected to alt/az for the observer and instant.
 - 🌌 **Constellations** — `constellation.FindAt` looks up the constellation containing an RA/Dec over the IAU (Delporte/Roman) default dataset, with `List` and `Lookup` alongside it. The lookup machinery is universal; the dataset is consumer-overridable.
 - 📐 **Discs, not points** — Sun and Moon positions are the **center of the disc**, always paired with **angular diameter**, so a consumer can size the disc and compute alignment/overlap (eclipses, occultations) purely from the data.
@@ -71,6 +71,31 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 - 🧭 **Configurable segmentation** — twilight thresholds and band labels are data. Earth defaults ship (−18/−12/−6°, golden hour, sunrise/sunset), and `earth.NewSunTimesWith` takes a `Segmentation` to redefine them wholesale.
 - 🕛 **Seamless midnight rollover** — `earth.SegmentAt` answers "which band, and how far through it, at `now`" and stitches across midnight with no gap. Callers ask only for `now`, never for the previous or next day.
 - 🧵 **Stateless & concurrency-safe** — every call takes the observer and `time.Time`; nothing is captured at construction, so the same instance serves many visitors at once.
+
+## 🌓 Which way the Moon is lit
+
+`moon.BrightLimbAt` says which way the Moon's lit side faces, as numbers rather than a guess from the phase name. It returns three angles in degrees, all turning counter-clockwise as the observer sees the sky (90 is left of the reference, 270 right):
+
+- `PositionAngle`: from celestial north through east (Meeus 48.5). A property of the sky.
+- `Parallactic`: the angle from celestial north to the zenith at the Moon (Meeus 14.1).
+- `ZenithAngle`: `PositionAngle − Parallactic`, measured from "up" on the observer's sky. This is the one a screen needs.
+
+### Drawing the crescent
+
+```go
+obs := astronomy.Observer{Lat: 39.74, Lng: -104.99}
+when := time.Date(2027, 6, 8, 4, 0, 0, 0, time.UTC) // a June evening crescent, low in the west
+
+bl, err := moon.BrightLimbAt(obs, when)
+if err != nil {
+	panic(err)
+}
+// ZenithAngle = 230.5: between down (180) and right (270), toward the set Sun.
+a := bl.ZenithAngle * math.Pi / 180
+x, y := -math.Sin(a), -math.Cos(a) // screen vector toward the lit side (x right, y down): 0.77, 0.64
+```
+
+The angle points at the Sun even below the horizon, because both bodies use their topocentric apparent places. Near New and Full Moon (under about 0.1% or over 99.9% lit) there is no visible bright limb to orient, and the angle should be treated as undefined. Against JPL Horizons DE441 (`PsAng`) the position angle agrees to within 0.01°.
 
 ## ⛰️ Observer height
 
