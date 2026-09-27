@@ -10,7 +10,7 @@ Import path: `github.com/Bugs5382/go-astronomy/earth/moon`
 
 The Earth vantage on Luna, the Earth's moon: its topocentric horizontal position and apparent size, its phase and illumination, its rise and set for an observer, and an arc track over a time span. The Moon belongs to Earth in this library's architecture, so the package lives under `earth`; other bodies would own their own moons.
 
-Positions are the center of the disc, in degrees, paired with the apparent angular diameter. Altitudes from `Position` are geometric (no refraction) and topocentric (moved to the observer on the flattened WGS84 Earth by the rigorous parallax correction); `ApparentPosition` adds atmospheric refraction. The diameter is topocentric too: it is sized from the observer's distance to the Moon, not the distance from the Earth's center. The package is stateless and concurrency-safe. Accuracy is arcminute-class; nutation and ΔT are below that floor and are not modeled.
+Positions are the center of the disc, in degrees, paired with the apparent angular diameter. Altitudes from `Position` are geometric (no refraction) and topocentric (moved to the observer on the flattened WGS84 Earth by the rigorous parallax correction); `ApparentPosition` adds atmospheric refraction. The diameter is topocentric too: it is sized from the observer's distance to the Moon, not the distance from the Earth's center. The package is stateless and concurrency-safe. Positions are computed on Terrestrial Time with nutation and agree with JPL Horizons DE441 to about 10″.
 
 ## 📍 Position
 

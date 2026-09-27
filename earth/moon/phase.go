@@ -113,7 +113,7 @@ func newMoonBefore(jde float64) float64 {
 // Age returns the Moon's age at t: the time elapsed since the most recent New
 // Moon, in days. It runs from 0 at New Moon up to one synodic month.
 func Age(t time.Time) float64 {
-	jde := julian.Date(t)
+	jde := julian.TT(t)
 	return jde - newMoonBefore(jde)
 }
 
@@ -132,7 +132,7 @@ func Age(t time.Time) float64 {
 // that far short of 180 and of 0. A caller that wants "how full is the disc"
 // should read Illumination, which does reach both ends.
 func PhaseAngle(t time.Time) float64 {
-	return ephemeris.MoonPhaseAngle(julian.Date(t))
+	return ephemeris.MoonPhaseAngle(julian.TT(t))
 }
 
 // Illumination returns the fraction of the Moon's disc that is lit at t, in
@@ -161,7 +161,7 @@ const phaseSector = 360.0 / 8
 // years, naming the phase by age disagrees with the sky for 10.2% of the time,
 // in runs of up to 22 hours. Age remains available for callers who want the age.
 func PhaseAt(t time.Time) Phase {
-	elongation := ephemeris.MoonElongation(julian.Date(t))
+	elongation := ephemeris.MoonElongation(julian.TT(t))
 	// The sectors are centered on the named points, so New straddles 0 and the
 	// half-sector offset can carry the index to 8; the modulus brings it home.
 	return Phase(int(math.Floor((elongation+phaseSector/2)/phaseSector)) % 8)
@@ -182,12 +182,12 @@ func NextFull(t time.Time) time.Time {
 // nearest that year; when the nearest event is at or before t, the search steps
 // forward one whole lunation at a time until it lands after t.
 func nextPhaseEvent(t time.Time, event func(float64) float64) time.Time {
-	jde := julian.Date(t)
+	jde := julian.TT(t)
 	y := ephemeris.JDEToJulianYear(jde)
 	e := event(y)
 	for e <= jde {
 		y += lunationYear
 		e = event(y)
 	}
-	return julian.Time(e)
+	return julian.FromTT(e)
 }

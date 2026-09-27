@@ -100,18 +100,15 @@ var ephemerisSeasonBoundaries = []struct {
 // TestSeasonBoundariesAgainstEphemeris measures the season boundaries against a
 // modern numerical ephemeris.
 //
-// Two known offsets are expected. Meeus gives the accuracy of the abridged
-// chapter 27 series as within one minute of time for the years 1951 to 2050.
-// On top of that, the series returns dynamical time while this library does not
-// model Delta-T and hands the result back as if it were UTC, which in the
-// modern era shifts the instant by a little over a minute. The three minute
-// tolerance covers both; each is a documented limit rather than a defect, and
-// neither is visible at the granularity a season is reported at.
+// The series returns dynamical time, which JDEToTime converts to UTC with the
+// leap-second table (issue 45). What remains is the abridged chapter 27 series,
+// which Meeus gives as good to within one minute for the years 1951 to 2050.
+// The observed error is under 28 s, and the tolerance is 45 s.
 func TestSeasonBoundariesAgainstEphemeris(t *testing.T) {
 	t.Parallel()
-	const tol = 3 * time.Minute
+	const tol = 45 * time.Second
 	for _, c := range ephemerisSeasonBoundaries {
-		got := JDToTime(c.fn(c.year))
+		got := JDEToTime(c.fn(c.year))
 		if d := got.Sub(c.utc); d > tol || d < -tol {
 			t.Errorf("%s = %v, ephemeris %v (%v off)", c.name, got.UTC(), c.utc, d)
 		}

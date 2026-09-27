@@ -49,6 +49,9 @@ func TestIlluminationMeeusExample(t *testing.T) {
 	}
 }
 
+// ttMinusUTC2026 is TT - UTC throughout 2026: 32.184 s plus 37 leap seconds.
+const ttMinusUTC2026 = 69184 * time.Millisecond
+
 // ephemerisPhase is the Moon's phase angle in degrees and illuminated fraction
 // of the disc, from the JPL Horizons system (target 301, center 500@399,
 // quantities "phi" and "Illu%"), tabulated in Terrestrial Time.
@@ -59,9 +62,9 @@ func TestIlluminationMeeusExample(t *testing.T) {
 // worst conditioned: it approaches 180 degrees, where a small change in the
 // geometry is a large change in the angle.
 //
-// This library omits Delta-T deliberately, so the instants are handed to it as
-// the Terrestrial Time instants Horizons reports, unshifted. Comparing in TT
-// keeps that omission out of the measurement.
+// The instants are the Terrestrial Time instants Horizons reports. The library
+// takes UTC, so each is handed over 69.184 s earlier (TT - UTC in 2026), which
+// is the same physical instant.
 var ephemerisPhase = []struct {
 	when                    time.Time
 	phaseAngle, illuminated float64
@@ -88,17 +91,18 @@ var ephemerisPhase = []struct {
 //
 // A caller may read the phase angle for something other than illumination --
 // the position angle of the illuminated limb, for instance -- where a degree
-// of error shows. Five hundredths of a degree is the standard the accurate
-// method of chapter 48 holds; the worst disagreement measured over these
-// instants is 0.013 degrees.
+// of error shows. The worst disagreement measured over these instants, handed
+// over as UTC, is 0.013 degrees in the angle and 9e-5 in the fraction, so the
+// tolerances are 0.02 degrees and 1.5e-4.
 func TestPhaseAngleAgainstEphemeris(t *testing.T) {
 	t.Parallel()
 	for _, e := range ephemerisPhase {
-		if got := moon.PhaseAngle(e.when); abs(got-e.phaseAngle) > 0.05 {
-			t.Errorf("PhaseAngle(%s) = %.4f, ephemeris %.4f", e.when, got, e.phaseAngle)
+		when := e.when.Add(-ttMinusUTC2026)
+		if got := moon.PhaseAngle(when); abs(got-e.phaseAngle) > 0.02 {
+			t.Errorf("PhaseAngle(%s) = %.4f, ephemeris %.4f", when, got, e.phaseAngle)
 		}
-		if got := moon.Illumination(e.when); abs(got-e.illuminated) > 2e-4 {
-			t.Errorf("Illumination(%s) = %.6f, ephemeris %.6f", e.when, got, e.illuminated)
+		if got := moon.Illumination(when); abs(got-e.illuminated) > 1.5e-4 {
+			t.Errorf("Illumination(%s) = %.6f, ephemeris %.6f", when, got, e.illuminated)
 		}
 	}
 }

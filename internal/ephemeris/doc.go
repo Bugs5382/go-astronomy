@@ -24,9 +24,9 @@
 // this package differs most from its source: it uses plain float64 throughout
 // rather than a units type, and states the unit in every signature.
 //
-// Times are Julian ephemeris days (JDE). This library does not model Delta-T,
-// so callers pass a Julian day derived from UTC and accept the resulting
-// sub-arcminute error; see the accuracy note in AGENTS.md.
+// Times are Julian ephemeris days (JDE), on Terrestrial Time. TimeToJDE and
+// JDEToTime convert to and from a UTC time.Time with the leap-second table in
+// deltat.go.
 //
 // The package is stateless, allocation-free on the hot paths, and safe for
 // concurrent use.

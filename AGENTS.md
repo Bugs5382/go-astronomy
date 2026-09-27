@@ -109,9 +109,11 @@ func main() {
    the consuming service.
 7. **Do not import `internal/`.** It is unexported by policy and may change
    without notice. Consume only the packages in the map above.
-8. **Accuracy is arcminute-class.** Nutation, ΔT, and leap seconds are
-   deliberately omitted (below the precision floor). Do not rely on the library
-   for higher-precision ephemeris work.
+8. **Accuracy is arcminute-class.** The Sun and Moon run on Terrestrial Time
+   (ΔT from the IERS leap-second table) with nutation, and match JPL Horizons
+   to within about 10″ (Moon) and 35″ (Sun). Star positions still omit nutation
+   and aberration. Do not rely on the library for higher-precision ephemeris
+   work.
 
 ## Build, test, lint (contributors)
 

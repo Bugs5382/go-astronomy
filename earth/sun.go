@@ -37,8 +37,9 @@ import (
 // observer at instant t: the direction to the center of the disc paired with the
 // disc's apparent angular diameter. The altitude is geometric and does not
 // include atmospheric refraction, which the twilight segmentation folds into its
-// horizon threshold instead. The apparent equatorial position accounts for
-// nutation and aberration.
+// horizon threshold instead. The position is computed on Terrestrial Time and
+// accounts for nutation, aberration, and the observer's parallax on the
+// flattened Earth.
 //
 // This is the Earth vantage on the Sun. Every part of it is Earth-specific: the
 // Sun's apparent right ascension and declination come from the Earth's orbit
@@ -47,16 +48,21 @@ import (
 // diameter follows from the Earth-Sun distance. Only the size-versus-distance
 // relation, sun.ApparentDiameter, is universal Sun physics.
 func SunPosition(obs astronomy.Observer, t time.Time) astronomy.Position {
-	jd := julian.Date(t)
-	ra, dec := ephemeris.SolarApparentEquatorial(jd)
-	gst := julian.GreenwichSiderealTime(t)
+	// The solar theory runs on Terrestrial Time; the Earth's rotation runs on
+	// UT, taken as UTC (issue 45).
+	jde := julian.TT(t)
+	ra, dec, distKm := ephemeris.SunApparent(jde)
+	gst := julian.ApparentSiderealTime(t)
 
+	// Move the geocentric place to the observer: the solar parallax is up to
+	// 8.8 arc seconds.
+	ra, dec, _ = ephemeris.Topocentric(ra, dec, distKm, obs.Lat, 0, gst+obs.Lng)
 	hz := coordinates.EquatorialToHorizontal(
 		coordinates.Equatorial{RA: ra, Dec: dec},
 		obs.Lat, obs.Lng, gst,
 	)
 
-	distanceAU := ephemeris.SolarRadius(ephemeris.J2000Century(jd))
+	distanceAU := ephemeris.SolarRadius(ephemeris.J2000Century(jde))
 
 	return astronomy.Position{
 		Horizontal: astronomy.Horizontal{

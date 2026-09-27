@@ -16,8 +16,8 @@
 // on the flattened WGS84 Earth by the rigorous parallax correction), and the
 // diameter is measured from that same observer; ApparentPosition adds
 // atmospheric refraction. The package is stateless and concurrency-safe: time is
-// always a parameter, never captured. Accuracy is amateur, arcminute-class;
-// nutation and delta-T are below that floor and are not modeled.
+// always a parameter, never captured. Positions are computed on Terrestrial
+// Time, with nutation, and are good to about ten arc seconds.
 package moon
 
 /*
@@ -101,18 +101,22 @@ func validateObserver(obs astronomy.Observer) error {
 // topocentric returns the Moon's topocentric horizontal coordinates (geometric,
 // without refraction) and its apparent angular semidiameter in degrees at t, as
 // seen by the observer. The geocentric ecliptic position from the meeus lunar
-// theory is rotated into the equatorial frame with the mean obliquity, then
+// theory, evaluated on Terrestrial Time and corrected for nutation, is rotated
+// into the equatorial frame with the true obliquity, then
 // moved from the Earth's centre to the observer on the WGS84 ellipsoid with the
 // rigorous parallax correction (Meeus chapter 40). The semidiameter comes from
 // the same observer-to-Moon distance, so the disc size and the altitude
 // describe one Moon from one vantage point (issue 44).
 func topocentric(obs astronomy.Observer, t time.Time) (coordinates.Horizontal, float64) {
-	jde := julian.Date(t)
+	// The lunar theory runs on Terrestrial Time and gives the mean equinox of
+	// date; nutation moves it to the true equinox the Sun uses, and apparent
+	// sidereal time matches that frame (issue 45).
+	jde := julian.TT(t)
 	lam, bet, dist := ephemeris.MoonPosition(jde)
-	obl := julian.MeanObliquity(t)
+	dpsi, deps := ephemeris.Nutation(jde)
 	eq := coordinates.EclipticToEquatorial(
-		coordinates.Ecliptic{Lon: lam, Lat: bet}, obl)
-	gst := julian.GreenwichSiderealTime(t)
+		coordinates.Ecliptic{Lon: lam + dpsi, Lat: bet}, ephemeris.MeanObliquity(jde)+deps)
+	gst := julian.ApparentSiderealTime(t)
 
 	ra, dec, topoDist := ephemeris.Topocentric(eq.RA, eq.Dec, dist, obs.Lat, 0, gst+obs.Lng)
 	hz := coordinates.EquatorialToHorizontal(

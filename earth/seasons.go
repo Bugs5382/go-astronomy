@@ -99,10 +99,10 @@ func northernSeasonStarts(year int) [4]struct {
 		when   time.Time
 		season Season
 	}{
-		{julian.Time(ephemeris.MarchEquinox(year)), Spring},
-		{julian.Time(ephemeris.JuneSolstice(year)), Summer},
-		{julian.Time(ephemeris.SeptemberEquinox(year)), Fall},
-		{julian.Time(ephemeris.DecemberSolstice(year)), Winter},
+		{julian.FromTT(ephemeris.MarchEquinox(year)), Spring},
+		{julian.FromTT(ephemeris.JuneSolstice(year)), Summer},
+		{julian.FromTT(ephemeris.SeptemberEquinox(year)), Fall},
+		{julian.FromTT(ephemeris.DecemberSolstice(year)), Winter},
 	}
 }
 

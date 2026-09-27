@@ -155,7 +155,7 @@ bash .claude/hooks/install.sh
 - 🤖 **Working in this repo (agents)** — [`AGENTS.md`](./AGENTS.md)
 - 📖 **Guides** — a Docusaurus documentation site is planned; this section will link it once it ships.
 
-Accuracy target is amateur / arcminute-class. The library omits nutation, ΔT, and leap seconds — they sit below that precision floor.
+Accuracy target is amateur / arcminute-class. The Sun and Moon are computed on Terrestrial Time (ΔT from the IERS leap-second table) with nutation and the observer's parallax, and agree with JPL Horizons DE441 to within about 10″ for the Moon and 35″ for the Sun. Star positions still omit nutation and aberration.
 
 ## 🤝 Contributing
 
