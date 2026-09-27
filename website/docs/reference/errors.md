@@ -27,6 +27,8 @@ The codes are part of the public contract: a code is never renumbered, only adde
 | 7008 | `CodeInvalidFieldOfView` | Azimuth field of view or arc span not positive. |
 | 7009 | `CodeInvalidElevationScale` | `Geometric` elevation degrees-per-pixel not positive. |
 | 7010 | `CodeXModeNotAzimuth` | Column-to-azimuth query on a non-azimuth horizontal mode. |
+| 7011 | `CodeInvalidElevation` | Observer elevation not finite or outside `[-1000, 9000]` m. |
+| 7012 | `CodeElevationLookup` | Elevation lookup failed or returned no usable height. |
 
 These constants are declared on the root `astronomy` package.
 
@@ -34,7 +36,9 @@ These constants are declared on the root `astronomy` package.
 
 Each error-returning package also exports named sentinels you can match with `errors.Is`, wrapped inside the coded error:
 
-- `earth.ErrInvalidLatitude`, `earth.ErrInvalidLongitude`, `earth.ErrInvalidSegmentation`
+- `earth.ErrInvalidLatitude`, `earth.ErrInvalidLongitude`, `earth.ErrInvalidSegmentation`, `earth.ErrInvalidElevation`
+- `moon.ErrInvalidLatitude`, `moon.ErrInvalidLongitude`, `moon.ErrInvalidElevation`
+- `elevation.ErrInvalidLatitude`, `elevation.ErrInvalidLongitude`, `elevation.ErrLookupFailed`
 - `star.ErrEmptyMagnitudeRange`
 - `project.ErrInvalidCanvas`, `project.ErrInvalidHorizonFraction`, `project.ErrInvalidPeakAltitude`, `project.ErrInvalidFieldOfView`, `project.ErrInvalidElevationScale`, `project.ErrXModeNotAzimuth`
 

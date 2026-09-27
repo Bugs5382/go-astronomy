@@ -83,6 +83,11 @@ var (
 	// the range [-180, 180]; the coded error carries
 	// astronomy.CodeInvalidLongitude.
 	ErrInvalidLongitude = errors.New("moon: observer longitude out of range")
+	// ErrInvalidElevation is the cause when the observer's elevation is not a
+	// finite number of metres within [astronomy.MinElevation,
+	// astronomy.MaxElevation]; the coded error carries
+	// astronomy.CodeInvalidElevation.
+	ErrInvalidElevation = errors.New("moon: observer elevation not finite or out of range")
 )
 
 // validateObserver reports the coded error for an out-of-range observer, or nil
@@ -94,6 +99,9 @@ func validateObserver(obs astronomy.Observer) error {
 	}
 	if obs.Lng < -180 || obs.Lng > 180 {
 		return apperr.Coded(astronomy.CodeInvalidLongitude, ErrInvalidLongitude)
+	}
+	if !earth.ValidElevation(obs.Elevation) {
+		return apperr.Coded(astronomy.CodeInvalidElevation, ErrInvalidElevation)
 	}
 	return nil
 }
@@ -118,7 +126,7 @@ func topocentric(obs astronomy.Observer, t time.Time) (coordinates.Horizontal, f
 		coordinates.Ecliptic{Lon: lam + dpsi, Lat: bet}, ephemeris.MeanObliquity(jde)+deps)
 	gst := julian.ApparentSiderealTime(t)
 
-	ra, dec, topoDist := ephemeris.Topocentric(eq.RA, eq.Dec, dist, obs.Lat, 0, gst+obs.Lng)
+	ra, dec, topoDist := ephemeris.Topocentric(eq.RA, eq.Dec, dist, obs.Lat, obs.Elevation, gst+obs.Lng)
 	hz := coordinates.EquatorialToHorizontal(
 		coordinates.Equatorial{RA: ra, Dec: dec}, obs.Lat, obs.Lng, gst)
 

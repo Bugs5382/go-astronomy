@@ -35,7 +35,28 @@ type Observer struct {
 	Lng float64
 	// TZ is the observer's local time zone. A nil value is treated as UTC.
 	TZ *time.Location
+	// Elevation is the observer's height above sea level, in metres. Zero, the
+	// default, is sea level and reproduces the sea-level answers exactly.
+	//
+	// From height the horizon sits below the astronomical horizon by the dip
+	// (see earth.HorizonDip), so the Sun and Moon rise earlier and set later.
+	// The dip assumes an unobstructed sea horizon: it is right for a
+	// mountaintop or a coast and optimistic in a valley, where terrain hides
+	// the true horizon. An elevation looked up from a digital elevation model
+	// is a grid-cell average, not the ground under the observer, so the input
+	// carries that error too. Heights from -1000 to 9000 m are accepted; below
+	// sea level the dip is zero. The height also enters the parallax of the
+	// Sun and the Moon, where it is worth under an arc second.
+	Elevation float64
 }
+
+// MinElevation and MaxElevation bound Observer.Elevation, in metres. They
+// span the lowest dry land (about -430 m at the Dead Sea shore) and the highest
+// summit (8849 m) with margin; a value outside them is rejected as a mistake.
+const (
+	MinElevation = -1000
+	MaxElevation = 9000
+)
 
 // Location returns the observer's time zone, defaulting to UTC when TZ is nil.
 func (o Observer) Location() *time.Location {

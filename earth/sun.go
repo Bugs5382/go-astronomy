@@ -57,7 +57,7 @@ func SunPosition(obs astronomy.Observer, t time.Time) astronomy.Position {
 	// Move the geocentric place to the observer: the solar parallax is up to
 	// 8.8 arc seconds. The disc stays sized from the Earth-Sun distance: the
 	// observer's offset changes it by under 5e-5 of itself.
-	ra, dec, _ = ephemeris.Topocentric(ra, dec, distKm, obs.Lat, 0, gst+obs.Lng)
+	ra, dec, _ = ephemeris.Topocentric(ra, dec, distKm, obs.Lat, obs.Elevation, gst+obs.Lng)
 	hz := coordinates.EquatorialToHorizontal(
 		coordinates.Equatorial{RA: ra, Dec: dec},
 		obs.Lat, obs.Lng, gst,

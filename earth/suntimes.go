@@ -25,6 +25,7 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import (
 	"errors"
+	"math"
 	"sort"
 	"time"
 
@@ -56,6 +57,11 @@ var (
 	// its levels are not in strictly ascending altitude order; the coded error
 	// carries astronomy.CodeInvalidSegmentation.
 	ErrInvalidSegmentation = errors.New("earth: segmentation levels must be non-empty and strictly ascending")
+	// ErrInvalidElevation is the cause when the observer's elevation is not a
+	// finite number of metres within [astronomy.MinElevation,
+	// astronomy.MaxElevation]; the coded error carries
+	// astronomy.CodeInvalidElevation.
+	ErrInvalidElevation = errors.New("earth: observer elevation not finite or out of range")
 )
 
 // validateObserver reports the coded error for an out-of-range observer, or nil
@@ -68,7 +74,17 @@ func validateObserver(obs astronomy.Observer) error {
 	if obs.Lng < -180 || obs.Lng > 180 {
 		return apperr.Coded(astronomy.CodeInvalidLongitude, ErrInvalidLongitude)
 	}
+	if !ValidElevation(obs.Elevation) {
+		return apperr.Coded(astronomy.CodeInvalidElevation, ErrInvalidElevation)
+	}
 	return nil
+}
+
+// ValidElevation reports whether an observer elevation is a finite number of
+// metres within [astronomy.MinElevation, astronomy.MaxElevation]. NaN fails
+// every comparison, so it is rejected.
+func ValidElevation(h float64) bool {
+	return !math.IsInf(h, 0) && h >= astronomy.MinElevation && h <= astronomy.MaxElevation
 }
 
 // SunTimes is the Sun's civil day for one observer: the ordered twilight and
@@ -98,11 +114,15 @@ func NewSunTimes(obs astronomy.Observer, date time.Time) (*SunTimes, error) {
 }
 
 // NewSunTimesWith is NewSunTimes with a caller-supplied Segmentation, letting a
-// consumer redefine the thresholds and labels wholesale.
+// consumer redefine the thresholds and labels wholesale. For an observer above
+// sea level the segmentation's horizon and its dip-corrected levels are
+// lowered by the horizon dip first; the result must still be strictly
+// ascending.
 func NewSunTimesWith(obs astronomy.Observer, date time.Time, seg Segmentation) (*SunTimes, error) {
 	if err := validateObserver(obs); err != nil {
 		return nil, err
 	}
+	seg = seg.atElevation(obs.Elevation)
 	if err := validateSegmentation(seg); err != nil {
 		return nil, err
 	}
@@ -429,11 +449,13 @@ func SegmentAt(obs astronomy.Observer, t time.Time) (Segment, float64, error) {
 	return SegmentAtWith(obs, t, DefaultSegmentation)
 }
 
-// SegmentAtWith is SegmentAt with a caller-supplied Segmentation.
+// SegmentAtWith is SegmentAt with a caller-supplied Segmentation, adjusted for
+// the observer's elevation as in NewSunTimesWith.
 func SegmentAtWith(obs astronomy.Observer, t time.Time, seg Segmentation) (Segment, float64, error) {
 	if err := validateObserver(obs); err != nil {
 		return Segment{}, 0, err
 	}
+	seg = seg.atElevation(obs.Elevation)
 	if err := validateSegmentation(seg); err != nil {
 		return Segment{}, 0, err
 	}

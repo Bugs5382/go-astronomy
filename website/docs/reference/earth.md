@@ -65,9 +65,10 @@ type Segment struct {
 func (s Segment) Contains(t time.Time) bool
 
 type Level struct {
-	Altitude float64 // geometric center altitude of the boundary, degrees
-	Rising   string  // label of the band above this level while the Sun climbs
-	Setting  string  // label of the band above this level while the Sun sinks
+	Altitude     float64 // geometric center altitude of the boundary, degrees
+	Rising       string  // label of the band above this level while the Sun climbs
+	Setting      string  // label of the band above this level while the Sun sinks
+	DipCorrected bool    // lower this level by the horizon dip for the observer's elevation
 }
 
 type Segmentation struct {
@@ -77,6 +78,8 @@ type Segmentation struct {
 }
 
 var DefaultSegmentation Segmentation
+
+func (s Segmentation) WithTwilightDip() Segmentation
 ```
 
 A `Segmentation` divides the Sun's altitude over a civil day into named bands. `DefaultSegmentation` is the Earth default: astronomical (−18°), nautical (−12°), and civil (−6°) twilight, the sunrise/sunset horizon crossing (−0.833°, upper limb including refraction), a short sunrise/sunset band up to −0.3°, golden hour up to +6°, and full day above that. A band takes its `Rising` label while the Sun climbs through it and its `Setting` label while the Sun sinks, so a twilight band that runs past local midnight keeps one label on both dates. The day is split at solar noon, and at solar midnight when the Sun stays above the lowest level all night, so the daytime band has morning (`Rising`) and afternoon (`Setting`) halves. Treat `DefaultSegmentation` as read-only; build a fresh value to customize.
@@ -91,6 +94,21 @@ func Refraction(apparentAltDeg float64) float64
 ```
 
 `Refraction` returns the atmospheric refraction, in degrees, that lifts a body seen at a given apparent altitude above its true geometric altitude, using Bennett's formula for a standard atmosphere (about 0.57° at the horizon, falling to zero near the zenith). `HorizonAltitude` (−0.833°) is the geometric center altitude at which the Sun's upper limb sits on the horizon under that refraction plus the mean solar semidiameter; it is the sunrise/sunset threshold.
+
+## ⛰️ Observer elevation and the horizon dip
+
+```go
+const DipArcminPerRootMetre = 1.76
+func HorizonDip(elevationM float64) float64
+func ValidElevation(h float64) bool
+var ErrInvalidElevation error
+```
+
+`astronomy.Observer` carries an optional `Elevation` in metres above sea level. Zero, the default, is sea level and reproduces the sea-level answers exactly. From height the sea horizon sits below the astronomical horizon by the dip, `1.76′ × √h` (the Nautical Almanac value, which includes standard terrestrial refraction), so the Sun rises earlier and sets later: at Denver (1609 m) by about eight minutes. `HorizonDip` returns it in degrees and is zero at or below sea level.
+
+By default only sunrise and sunset move. `DefaultSegmentation` marks the sunrise and sunset crossing (−0.833°) and the top of the sunrise band (−0.3°) as `DipCorrected`, and the segmentation's `Horizon` always takes the dip. The civil, nautical, and astronomical twilight levels do not: by the USNO convention they are the Sun's depression below the astronomical horizon. `WithTwilightDip` returns a copy with every level dip-corrected, for a consumer that wants the twilight bands to track the horizon the observer actually sees.
+
+Two limits are worth knowing. The dip assumes an unobstructed sea horizon: it is right on a mountaintop or a coast and optimistic in a valley, where terrain hides the true horizon and sunrise comes later, not earlier. And an elevation looked up from a digital elevation model is a grid-cell average rather than the ground under the observer. Heights from −1000 m to 9000 m are accepted; anything else, or a non-finite value, is rejected with `ErrInvalidElevation` (code 7011). The height also enters the Sun's and the Moon's parallax, where it is worth under an arc second. To look an elevation up from a coordinate, see [`elevation`](./elevation.md).
 
 ## ❄️ Polar states
 

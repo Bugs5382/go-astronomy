@@ -27,6 +27,7 @@ import (
 	"time"
 
 	astronomy "github.com/Bugs5382/go-astronomy"
+	"github.com/Bugs5382/go-astronomy/earth"
 )
 
 // horizonRefraction is the atmospheric refraction at the horizon, in degrees
@@ -68,15 +69,17 @@ func NextSet(obs astronomy.Observer, t time.Time) (time.Time, bool, error) {
 // direction and refines it by bisection. The crossing function is the Moon's
 // topocentric geometric center altitude minus the rise/set threshold, which is
 // the negative of the horizon refraction plus the Moon's apparent semidiameter
-// at that instant. A rising crossing is a change from negative to non-negative;
-// a setting crossing is the reverse.
+// at that instant, lowered further by the horizon dip for the observer's
+// elevation (issue 52). A rising crossing is a change from negative to
+// non-negative; a setting crossing is the reverse.
 func nextCrossing(obs astronomy.Observer, t time.Time, rising bool) (time.Time, bool, error) {
 	if err := validateObserver(obs); err != nil {
 		return time.Time{}, false, err
 	}
+	dip := earth.HorizonDip(obs.Elevation)
 	f := func(when time.Time) float64 {
 		hz, semiDeg := topocentric(obs, when)
-		return hz.Altitude - (-(horizonRefraction + semiDeg))
+		return hz.Altitude - (-(horizonRefraction + semiDeg + dip))
 	}
 
 	prev := f(t)

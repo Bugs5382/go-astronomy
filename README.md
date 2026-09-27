@@ -70,6 +70,7 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 - 🖥️ **Pixel-agnostic projection** — the `project` package maps `(altitude°, azimuth°, timeProgress)` to `(x, y)` with selectable strategies (`XMode` = time-progress or azimuth; `YMode` = normalized-by-peak or geometric) and a configurable horizon anchor.
 - 🧭 **Configurable segmentation** — twilight thresholds and band labels are data. Earth defaults ship (−18/−12/−6°, golden hour, sunrise/sunset), and `earth.NewSunTimesWith` takes a `Segmentation` to redefine them wholesale.
 - 🕛 **Seamless midnight rollover** — `earth.SegmentAt` answers "which band, and how far through it, at `now`" and stitches across midnight with no gap. Callers ask only for `now`, never for the previous or next day.
+- ⛰️ **Observer elevation** — `Observer.Elevation` (metres) lowers the horizon by the dip, `1.76′ × √h`, so sunrise, sunset, and moonrise/moonset move with height (about eight minutes at Denver). Twilight levels stay on the astronomical horizon by default; `Segmentation.WithTwilightDip` opts them in. The optional `elevation/openmeteo` adapter looks a height up from the Open-Meteo elevation API; the core never touches the network.
 - 🧵 **Stateless & concurrency-safe** — every call takes the observer and `time.Time`; nothing is captured at construction, so the same instance serves many visitors at once.
 
 ## 📋 Requirements
