@@ -33,6 +33,7 @@ const sidebars: SidebarsConfig = {
             'reference/planets/neptune',
           ],
         },
+        'reference/sky',
         'reference/constellation',
         'reference/project',
         {

@@ -60,6 +60,10 @@ A planet's position is computed in two steps, and the first is published on its 
 
 Everything else in the library is a pure function of an observer and an instant. An Earth satellite is not: its position comes from an orbital element set that is measured and goes stale. So `satellite` takes the element set as an input, propagates it with SGP4 (the model it was fitted against), and never fetches one. `Elements.Age` tells a caller how old the answer's basis is, and passes are intervals because a satellite crosses the sky in minutes.
 
+## 🔭 Other vantages
+
+The observer does not have to stand on Earth. The `sky` package puts a site on any body and resolves any other from it, and everything that made the sky Earth-only becomes a property of the body: its rotation (the IAU pole and prime meridian), its shape, its refraction, and its twilight. On the airless Moon there is no refraction and no twilight, so a body sets when it geometrically sets and the day divides only at the Sun's horizon crossings. The Earth case goes through the v1 packages and gives their answers. See [sky](./reference/sky.md).
+
 ## ⛰️ Height and the horizon
 
 An observer's height moves the horizon, not the sky. From height the sea horizon sits below the astronomical horizon by the dip, so rise and set move while positions barely change (the height shifts the Sun's and Moon's parallax by under an arc second). The height is optional: leave it out for sea level and no network, set it by hand in feet or metres, or look it up with a resolver. The calculation functions never look anything up. A moving observer, such as a plane, passes its position and height for each instant. See [Observer and height](./reference/observer.md).
