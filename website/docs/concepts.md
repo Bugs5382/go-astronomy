@@ -52,6 +52,10 @@ Pass a zone-aware `time.Time` on every call. The library computes internally in 
 
 At high latitudes the Sun may not cross the horizon on a given day. That is an explicit state, never a nil panic or a `-1` sentinel. `SunTimes.Polar()` returns a `PolarState` of `MidnightSun` (Sun up all day) or `PolarNight` (Sun down all day) with a boolean that is false on an ordinary day. Absence in general is explicit throughout the API: `(value, bool)` or `(value, error)` where a result may not exist, for example no sunrise during a polar day.
 
+## 🛰️ Satellites take an element set
+
+Everything else in the library is a pure function of an observer and an instant. An Earth satellite is not: its position comes from an orbital element set that is measured and goes stale. So `satellite` takes the element set as an input, propagates it with SGP4 (the model it was fitted against), and never fetches one. `Elements.Age` tells a caller how old the answer's basis is, and passes are intervals because a satellite crosses the sky in minutes.
+
 ## 🎯 Accuracy
 
 The target is amateur, arcminute-class accuracy, using an in-house implementation of the Meeus algorithms. The Sun and Moon are computed on Terrestrial Time, with ΔT taken from the IERS leap-second table, and include nutation and the observer's parallax; against JPL Horizons DE441 the Moon is good to about 10″ and the Sun, from the VSOP87 series, to about 2″. Star positions still omit nutation and aberration. Do not rely on the library for higher-precision ephemeris work.

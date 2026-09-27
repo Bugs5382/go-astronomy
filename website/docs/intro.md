@@ -28,6 +28,7 @@ sidebar_position: 1
 | `.../constellation` | universal | IAU boundary lookup by RA/Dec. |
 | `.../earth` | Earth traits | Sun position and track, twilight bands, refraction, polar states, seasons, ground darkness, and star projection for an Earth observer. |
 | `.../earth/moon` | Earth traits | Luna: position, apparent position, phases, rise/set, and an arc track. |
+| `.../satellite` | Earth satellites | TLE and OMM parsing (caller-supplied, no network), SGP4/SDP4, look angles, sunlight, magnitude, and passes with visibility and shadow entry. |
 
 Adding a future body (for example `mars/`) would not change `sun`, `star`, or `constellation`.
 

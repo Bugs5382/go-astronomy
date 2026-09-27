@@ -73,6 +73,40 @@ Every returned `error` is a [go-apperr](https://github.com/Bugs5382/go-apperr) c
 - 🕛 **Seamless midnight rollover** — `earth.SegmentAt` answers "which band, and how far through it, at `now`" and stitches across midnight with no gap. Callers ask only for `now`, never for the previous or next day.
 - 🧵 **Stateless & concurrency-safe** — every call takes the observer and `time.Time`; nothing is captured at construction, so the same instance serves many visitors at once.
 
+## 🛰️ Satellites
+
+The `satellite` package places Earth satellites, the ISS among them, in an observer's sky from an element set you supply. It parses TLEs and CCSDS OMM (JSON or XML), propagates them with SGP4/SDP4, and never reaches the network.
+
+### Element sets
+
+```go
+e, err := satellite.ParseTLE(line1, line2) // checksums, Alpha-5 catalogue numbers
+sets, err := satellite.ParseOMM(r)          // CelesTrak or Space-Track OMM, JSON or XML
+if e.Age(time.Now()) > 3*24*time.Hour {
+	// a low orbit's element set is stale after a few days: refresh it
+}
+```
+
+### Where it is, and when it passes
+
+```go
+denver := astronomy.Observer{Lat: 39.74, Lng: -104.99}
+l, err := satellite.Position(denver, e, time.Now())
+// l.Altitude, l.Azimuth (degrees), l.RangeKm, l.Sunlit, l.Magnitude(satellite.ISSStandardMagnitude)
+
+opt := satellite.DefaultPassOptions()
+opt.StdMagnitude = satellite.ISSStandardMagnitude
+passes, err := satellite.Passes(denver, e, from, from.Add(24*time.Hour), opt)
+for _, p := range passes {
+	// p.Rise, p.Peak, p.Set; p.Visible (sunlit while you are in darkness);
+	// p.ShadowEntry, where it vanishes into the Earth's shadow
+}
+```
+
+### Accuracy
+
+The SGP4 port matches the reference verification output to under 0.1 m. Against Skyfield on the same element set, passes agree to 0.2 s and shadow crossings to 0.05 s. The real limit is the element set's age. See the [satellite reference page](./website/docs/reference/satellite.md) for frames, units, magnitudes, and errors.
+
 ## 📋 Requirements
 
 - Go **`>= 1.27`**

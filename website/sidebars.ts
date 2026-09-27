@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
         'reference/star',
         'reference/constellation',
         'reference/project',
+        'reference/satellite',
         'reference/errors',
       ],
     },
