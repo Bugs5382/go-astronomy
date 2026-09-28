@@ -119,13 +119,12 @@ func main() {
    the consuming service.
 7. **Do not import `internal/`.** It is unexported by policy and may change
    without notice. Consume only the packages in the map above.
-8. **Accuracy is arcminute-class.** The Sun and Moon run on Terrestrial Time
+8. **Accuracy is arcsecond-class.** The Sun and Moon run on Terrestrial Time
    (ΔT from the IERS leap-second table) with nutation, and match JPL Horizons
    to within about 0.5″ geocentric for the Moon (ELP 2000-82B) and 2″ for the
    Sun (VSOP87). Stars move along their proper motion and come out at their
-   apparent place (precession,
-   nutation, annual aberration, parallax), within about 0.1″ of the IAU SOFA
-   library. Do not rely on the library for higher-precision ephemeris work.
+   apparent place (precession, nutation, annual aberration, parallax), within
+   about 0.1″ of the IAU SOFA library.
 
 ## Build, test, lint (contributors)
 

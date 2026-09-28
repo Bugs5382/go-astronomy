@@ -9,7 +9,7 @@
 
 `go-astronomy` computes where the Sun, Moon, and stars are in the sky for a given observer and instant. It emits **degrees** (altitude, azimuth) and time-progress — never pixels — so any consumer can drive an animated sky, a rise/set table, a twilight timeline, or a moon-phase widget from the same data.
 
-It is designed for a service that computes a distinct sky per site visitor, so the API is **stateless, deterministic, and concurrency-safe**: `time.Time` is always a parameter, never captured at construction. The math is an in-house implementation of Jean Meeus' *Astronomical Algorithms* with no third-party ephemeris dependency (arcminute-class accuracy).
+It is designed for a service that computes a distinct sky per site visitor, so the API is **stateless, deterministic, and concurrency-safe**: `time.Time` is always a parameter, never captured at construction. The math is an in-house implementation of Jean Meeus' *Astronomical Algorithms* with no third-party ephemeris dependency (arcsecond-class accuracy).
 
 > **Status:** v1.0.0. Everything below ships, and every signature shown matches `go doc`. One item is marked **(roadmap)** where it appears: blue-moon detection.
 
@@ -404,7 +404,7 @@ bash .claude/hooks/install.sh
 - 🤖 **Working in this repo (agents)** — [`AGENTS.md`](./AGENTS.md)
 - 📖 **Guides** — a Docusaurus documentation site is planned; this section will link it once it ships.
 
-Accuracy target is amateur / arcminute-class. The Sun and Moon are computed on Terrestrial Time (ΔT from the IERS leap-second table) with nutation and the observer's parallax, and agree with JPL Horizons DE441 to within about 2″ for the Sun (VSOP87) and, for the Moon, 0.5″ geocentric and 1.5″ as the observer sees it (the ELP 2000-82B series, about a thousand terms; the Meeus chapter 47 abridgement it replaced was good to 10″). Stars are carried along their Hipparcos proper motion and radial velocity and reduced to their apparent place (precession, nutation, annual aberration, and parallax); against the IAU SOFA library they agree to about 0.1″ around the present and 0.35″ by 1950 or 2100.
+Accuracy target is arcsecond-class. The Sun and Moon are computed on Terrestrial Time (ΔT from the IERS leap-second table) with nutation and the observer's parallax, and agree with JPL Horizons DE441 to within about 2″ for the Sun (VSOP87) and, for the Moon, 0.5″ geocentric and 1.5″ as the observer sees it (the ELP 2000-82B series, about a thousand terms; the Meeus chapter 47 abridgement it replaced was good to 10″). Stars are carried along their Hipparcos proper motion and radial velocity and reduced to their apparent place (precession, nutation, annual aberration, and parallax); against the IAU SOFA library they agree to about 0.1″ around the present and 0.35″ by 1950 or 2100.
 
 ## 🤝 Contributing
 
