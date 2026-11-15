@@ -51,7 +51,7 @@ jobs:
       - name: GolangCI
         uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.13.2
+          version: v2.15.0
           # Build from source with the job's Go, so a newer go.mod never
           # outruns the toolchain the prebuilt binary was compiled with.
           install-mode: goinstall
